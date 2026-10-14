@@ -1,457 +1,636 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
+<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>gameberrylabs ASM — web &amp; network scan dashboard</title>
+<title>ASM Dashboard</title>
 <style>
-  :root {
-    --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --border: #2a2f3a;
-    --text: #e6e9ef; --muted: #8b94a7; --accent: #4f8cff;
-    --crit: #ff4d4f; --high: #ff8c3c; --med: #ffc93c; --low: #4fd1a5; --info: #6c7a93;
+:root{
+  --bg:#f4f6f8; --panel:#ffffff; --ink:#18212b; --muted:#667385; --line:#dfe4ea; --soft:#eef1f5;
+  --accent:#1f6f8b; --accent-ink:#ffffff; --hover:#f3f7fa;
+  --crit:#a8202b; --high:#d4531c; --medium:#b07a00; --low:#2a78a8; --info:#6a7687; --unknown:#8a94a3;
+  --ok:#23804f; --warn:#b07a00; --bad:#b8323c;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#0e1319; --panel:#151c24; --ink:#e4e9ef; --muted:#8997a8; --line:#263140; --soft:#1c2531;
+    --accent:#4fb0cf; --accent-ink:#06141a; --hover:#192230;
+    --crit:#c4333f; --high:#d9622b; --medium:#b88a14; --low:#3a8cbf; --info:#6f7c8e; --unknown:#6f7c8e;
+    --ok:#36a56b; --warn:#d9a21b; --bad:#e0505a;
   }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-    font-size: 14px;
-  }
-  header {
-    padding: 16px 20px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-    background: var(--panel);
-  }
-  header h1 { font-size: 16px; margin: 0; font-weight: 600; white-space: nowrap; }
-  header h1 span { color: var(--muted); font-weight: 400; }
-  select, input[type=text] {
-    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
-    border-radius: 6px; padding: 7px 10px; font-size: 13px;
-  }
-  input[type=text] { min-width: 240px; }
-  #globalSearch { margin-left: auto; }
-  #cards {
-    display: flex; gap: 10px; padding: 14px 20px; flex-wrap: wrap;
-    border-bottom: 1px solid var(--border);
-  }
-  .card {
-    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
-    padding: 10px 16px; min-width: 110px;
-  }
-  .card .n { font-size: 20px; font-weight: 700; }
-  .card .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
-  nav#tabs {
-    display: flex; gap: 2px; padding: 0 20px; background: var(--panel);
-    border-bottom: 1px solid var(--border); overflow-x: auto;
-  }
-  nav#tabs button {
-    background: transparent; border: none; color: var(--muted); padding: 12px 14px;
-    font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
-  }
-  nav#tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
-  nav#tabs button:hover { color: var(--text); }
-  main { padding: 16px 20px; }
-  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
-  .toolbar .count { color: var(--muted); font-size: 12px; margin-left: auto; }
-  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 8px; overflow: hidden; }
-  thead th {
-    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
-    color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--border);
-    background: var(--panel2); cursor: pointer; user-select: none;
-  }
-  thead th:hover { color: var(--text); }
-  tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; }
-  tbody tr:hover { background: var(--panel2); }
-  tbody tr:last-child td { border-bottom: none; }
-  a { color: var(--accent); text-decoration: none; }
-  a:hover { text-decoration: underline; }
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
-  .sev-critical { background: rgba(255,77,79,.15); color: var(--crit); }
-  .sev-high { background: rgba(255,140,60,.15); color: var(--high); }
-  .sev-medium { background: rgba(255,201,60,.15); color: var(--med); }
-  .sev-low { background: rgba(79,209,165,.15); color: var(--low); }
-  .sev-info { background: rgba(108,122,147,.15); color: var(--info); }
-  .status-2 { color: var(--low); } .status-3 { color: var(--med); }
-  .status-4 { color: var(--high); } .status-5 { color: var(--crit); }
-  .empty { color: var(--muted); padding: 30px; text-align: center; }
-  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
-  .shot { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: pointer; }
-  .shot img { width: 100%; height: 140px; object-fit: cover; display: block; background: #000; }
-  .shot .name { padding: 8px 10px; font-size: 12px; color: var(--muted); word-break: break-all; }
-  #lightbox {
-    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85);
-    align-items: center; justify-content: center; z-index: 100; cursor: zoom-out;
-  }
-  #lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 6px; }
-  .pill-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
-  .pill-toggle button {
-    background: var(--panel2); border: 1px solid var(--border); color: var(--muted);
-    border-radius: 14px; padding: 5px 12px; font-size: 12px; cursor: pointer;
-  }
-  .pill-toggle button.active { color: var(--text); border-color: var(--accent); }
-  footer { padding: 16px 20px; color: var(--muted); font-size: 12px; }
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+code,.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px}
+a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+
+#top{position:sticky;top:0;z-index:30;background:var(--panel);border-bottom:1px solid var(--line)}
+header{display:flex;align-items:center;gap:12px;padding:10px 16px;flex-wrap:wrap}
+.runwrap{display:flex;align-items:center;gap:6px}
+.runwrap select{min-width:210px;font-weight:600}
+.runwrap .lbl{color:var(--muted);font-size:12px}
+h1{font-size:15px;margin:0 0 0 6px;font-weight:650;letter-spacing:.01em}
+.grow{flex:1}
+.meta{color:var(--muted);font-size:12px}
+select,input[type=search],.btn,button.ghost{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 9px}
+select{max-width:260px}
+.btn,button.ghost{cursor:pointer} .btn:hover,button.ghost:hover{background:var(--hover)}
+.btn:disabled{opacity:.4;cursor:default}
+nav{display:flex;gap:0;overflow-x:auto;padding:0 10px;border-top:1px solid var(--line)}
+.tab{border:0;background:none;color:var(--muted);padding:10px 13px;cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--ink);border-bottom-color:var(--accent);font-weight:600}
+.tab .n{background:var(--soft);border-radius:9px;padding:0 7px;font-size:11px;margin-left:6px;color:var(--muted)}
+
+main{padding:16px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}
+.bar input[type=search]{width:min(320px,100%)}
+.fbox{display:contents}
+.count{color:var(--muted);font-size:12.5px}
+.note{color:var(--muted);font-size:12.5px;margin:-4px 0 10px}
+.empty{padding:36px 16px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:8px}
+.tw{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:auto}
+table{border-collapse:collapse;width:100%}
+th,td{padding:7px 11px;text-align:left;vertical-align:top;border-bottom:1px solid var(--line);word-break:break-word}
+th{position:sticky;top:0;background:var(--soft);font-weight:600;font-size:12.5px;cursor:pointer;white-space:nowrap;user-select:none}
+th .ar{color:var(--accent);margin-left:4px}
+tbody tr:hover{background:var(--hover)}
+tbody tr.clk{cursor:pointer}
+tr.dt td{background:var(--soft);padding:12px 16px}
+tr.dt:hover{background:none}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:10px 2px;color:var(--muted);font-size:12.5px}
+.chip{display:inline-block;background:var(--soft);border:1px solid var(--line);border-radius:4px;padding:0 6px;margin:1px 3px 1px 0;font-size:12px}
+.sev,.st,.tag{display:inline-block;border-radius:4px;padding:0 7px;font-size:12px;font-weight:600;color:#fff;text-transform:capitalize}
+.sev-critical{background:var(--crit)} .sev-high{background:var(--high)} .sev-medium{background:var(--medium)}
+.sev-low{background:var(--low)} .sev-info{background:var(--info)} .sev-unknown{background:var(--unknown)}
+.st{text-transform:none}.s2{background:var(--ok)} .s3{background:var(--low)} .s4{background:var(--medium)} .s5{background:var(--bad)}
+.yes{color:var(--ok);font-weight:600} .no{color:var(--muted)}
+.bad{color:var(--bad);font-weight:600} .warn{color:var(--warn);font-weight:600}
+pre{margin:6px 0 0;padding:10px;background:var(--bg);border:1px solid var(--line);border-radius:6px;overflow:auto;max-height:340px;font-size:12px;white-space:pre-wrap;word-break:break-all}
+dl.kv{display:grid;grid-template-columns:150px 1fr;gap:5px 14px;margin:0}
+dl.kv dt{color:var(--muted)} dl.kv dd{margin:0;word-break:break-word}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:18px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;cursor:pointer;text-align:left}
+.card:hover{border-color:var(--accent)}
+.card .v{font-size:26px;font-weight:650;line-height:1.1}
+.card .l{color:var(--muted);font-size:12.5px;margin-top:2px}
+.card .d{font-size:12px;margin-top:4px;color:var(--muted)} .d.up{color:var(--warn)} .d.down{color:var(--ok)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;margin-bottom:18px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.box h2{font-size:13px;margin:0 0 8px;font-weight:650}
+.brow{display:grid;grid-template-columns:110px 1fr 44px;gap:8px;align-items:center;padding:3px 4px;border-radius:4px;cursor:pointer;font-size:13px}
+.brow:hover{background:var(--hover)}
+.brow .t{height:8px;background:var(--soft);border-radius:4px;overflow:hidden}
+.brow .t i{display:block;height:100%;background:var(--accent)}
+.brow .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brow .c{text-align:right;color:var(--muted)}
+
+.gal{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.shot{background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow:hidden;cursor:pointer}
+.shot img{width:100%;aspect-ratio:16/10;object-fit:cover;object-position:top;display:block;background:var(--soft)}
+.shot div{padding:6px 9px;font-size:12px;word-break:break-all}
+#lb{position:fixed;inset:0;background:rgba(0,0,0,.82);display:none;align-items:center;justify-content:center;z-index:99;padding:20px;cursor:zoom-out}
+#lb img{max-width:100%;max-height:100%;border-radius:6px}
 </style>
 </head>
 <body>
-
-<header>
-  <h1>gameberrylabs ASM <span>— web &amp; network scan</span></h1>
-  <select id="runPicker" title="Scan run date"></select>
-  <input type="text" id="globalSearch" placeholder="Search current tab (any column)…">
-</header>
-
-<div id="cards"></div>
-
-<nav id="tabs"></nav>
-
-<main id="content"></main>
-
-<div id="lightbox"><img id="lightboxImg" src="" alt=""></div>
-
-<footer>Reads files written by <code>web_network_scan.sh</code> in this same directory. No server-side code — if tables stay empty, this page needs to be served over HTTP (e.g. <code>python3 -m http.server</code> from this folder), not opened as a local file.</footer>
+<div id="top">
+  <header>
+    <div class="runwrap">
+      <button class="btn" id="prev" title="Older run">&lsaquo;</button>
+      <select id="runSel" aria-label="Run date"></select>
+      <button class="btn" id="next" title="Newer run">&rsaquo;</button>
+    </div>
+    <h1>Attack surface dashboard</h1>
+    <span class="meta" id="runMeta"></span>
+    <span class="grow"></span>
+    <button class="btn" id="pick" title="Use this if the page is opened as a file instead of from a web server">Open output folder&hellip;</button>
+    <input type="file" id="folder" webkitdirectory multiple hidden>
+  </header>
+  <nav id="tabs"></nav>
+</div>
+<main id="view"></main>
+<div id="lb"><img alt=""></div>
 
 <script>
-// ============================================================================
-// Config — one entry per data file the script produces. Add a new tab by
-// adding one object here; nothing else needs to change for a simple table.
-// ============================================================================
-const TABS = [
-  { id: 'overview',   label: 'Overview' }, // special-cased, see renderOverview()
-  { id: 'subdomains',  label: 'Subdomains',    file: 'subfinder_raw.jsonl', type: 'jsonl',
-    columns: [['host','Host'],['source','Source']] },
-  { id: 'dns',         label: 'DNS Records',   file: 'dnsx_raw.jsonl', type: 'jsonl-dns',
-    columns: [['host','Host'],['a','A'],['aaaa','AAAA'],['cname','CNAME']] },
-  { id: 'webassets',   label: 'Web Assets',    file: 'httpx_raw.jsonl', type: 'jsonl',
-    columns: [['url','URL'],['status_code','Status'],['title','Title'],['webserver','Server'],['tech','Tech'],['cdn_name','CDN']],
-    filters: [{ key: 'status_code', label: 'Status', kind: 'status' }] },
-  { id: 'ports',       label: 'Open Ports',    file: 'naabu_raw.jsonl', type: 'jsonl-ports',
-    columns: [['ip','IP'],['port','Port']],
-    filters: [{ key: 'port', label: 'Port', kind: 'text' }] },
-  { id: 'tls',         label: 'TLS',           file: 'tlsx_raw.jsonl', type: 'jsonl',
-    columns: [['host','Host'],['tls_version','TLS Version'],['not_after','Expires'],['subject_an','SANs']] },
-  { id: 'crawled',     label: 'Crawled URLs',  file: 'crawled_urls.txt', type: 'txt',
-    columns: [['value','URL']] },
-  { id: 'dirfuzz',     label: 'Directory Fuzz',file: 'ffuf_combined.jsonl', type: 'jsonl',
-    columns: [['host','Host'],['url','Found URL'],['status','Status'],['length','Length'],['words','Words']],
-    filters: [{ key: 'status', label: 'Status', kind: 'status' }] },
-  { id: 'findings',    label: 'Findings',      file: 'findings_combined.jsonl', type: 'jsonl-finding',
-    columns: [['severity','Severity'],['template-id','Template'],['host','Host'],['matched-at','Matched At']],
-    filters: [{ key: 'severity', label: 'Severity', kind: 'severity' }] },
-  { id: 'dangling',    label: 'Dangling DNS',  file: 'dangling_dns.txt', type: 'txt',
-    columns: [['value','CNAME target not resolving']] },
-  { id: 'screenshots', label: 'Screenshots',   file: 'screenshots_index.json', type: 'images' },
-];
+(() => {
+'use strict';
 
-let currentTab = 'overview';
-let currentRunDate = null;
-let rowCache = {};          // tabId -> parsed rows (unfiltered)
-let activeFilters = {};     // tabId -> { filterKey: value }
+/* ---------- config ---------- */
+const BASE = './';            // dashboard.html sits in OUTPUT_BASE, next to runs_index.json
+const PAGE = 100;             // rows per page
+const SEV = ['critical','high','medium','low','info','unknown'];
 
-const $ = (sel) => document.querySelector(sel);
-const contentEl = $('#content');
-const tabsEl = $('#tabs');
-const cardsEl = $('#cards');
+/* ---------- helpers ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const arr = v => v == null || v === '' ? [] : Array.isArray(v) ? v : [v];
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const jsonl = t => t.split('\n').map(l => l.trim()).filter(Boolean).map(l => { try { return JSON.parse(l); } catch (e) { return null; } }).filter(Boolean);
+const lines = t => t.split('\n').map(s => s.trim()).filter(Boolean);
+const chip = t => `<span class="chip">${esc(t)}</span>`;
+const chips = a => arr(a).map(chip).join('');
+const sevBadge = s => `<span class="sev sev-${esc(s)}">${esc(s)}</span>`;
+const stBadge = c => c == null || c === '' ? '' : `<span class="st s${esc(String(c)[0])}">${esc(c)}</span>`;
+const link = u => /^https?:\/\//i.test(u) ? `<a href="${esc(u)}" target="_blank" rel="noopener noreferrer">${esc(u)}</a>` : esc(u);
+const yesNo = v => v === 'Yes' ? '<span class="yes">Yes</span>' : v === 'No' ? '<span class="no">No</span>' : esc(v);
+const pretty = o => `<pre>${esc(JSON.stringify(o, null, 2))}</pre>`;
+const lastTwo = h => h.split('.').slice(-2).join('.');
+const weekday = d => new Date(d + 'T00:00:00').toLocaleDateString(undefined, { weekday: 'short' });
 
-// ----------------------------------------------------------------------------
-// Bootstrap: find available run dates, pick the latest, build the tab bar.
-// ----------------------------------------------------------------------------
-async function init() {
-  tabsEl.innerHTML = TABS.map(t =>
-    `<button data-tab="${t.id}" class="${t.id === currentTab ? 'active' : ''}">${t.label}</button>`
-  ).join('');
-  tabsEl.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-tab]');
-    if (!btn) return;
-    switchTab(btn.dataset.tab);
+/* ---------- state ---------- */
+let fileMap = null;           // set when a folder was picked (works from file://)
+const S = { runs: [], run: null, tab: 'overview', cache: {}, ui: {}, manifests: {}, blobs: {} };
+
+/* ---------- file access ---------- */
+async function getText(rel) {
+  if (fileMap) { const f = fileMap.get(rel); return f ? f.text() : null; }
+  try { const r = await fetch(BASE + rel, { cache: 'no-store' }); return r.ok ? await r.text() : null; }
+  catch (e) { return null; }
+}
+function assetUrl(rel) {
+  if (fileMap) { const f = fileMap.get(rel); if (!f) return ''; return S.blobs[rel] ||= URL.createObjectURL(f); }
+  return BASE + rel.split('/').map(encodeURIComponent).join('/');
+}
+async function load(file, kind) {
+  const key = S.run + '/' + file;
+  if (!(key in S.cache)) {
+    const t = await getText(key);
+    let v = null;
+    if (t != null) { try { v = kind === 'jsonl' ? jsonl(t) : kind === 'lines' ? lines(t) : kind === 'json' ? JSON.parse(t) : t; } catch (e) { v = null; } }
+    S.cache[key] = v;
+  }
+  return S.cache[key];
+}
+async function getManifest(run) {
+  if (!(run in S.manifests)) {
+    const t = await getText(run + '/manifest.json');
+    try { S.manifests[run] = t ? JSON.parse(t) : null; } catch (e) { S.manifests[run] = null; }
+  }
+  return S.manifests[run];
+}
+async function discoverRuns() {
+  const set = new Set();
+  if (fileMap) {
+    for (const k of fileMap.keys()) { const d = k.split('/')[0]; if (DATE_RE.test(d)) set.add(d); }
+  } else {
+    try { arr(JSON.parse(await getText('runs_index.json'))).forEach(d => DATE_RE.test(d) && set.add(d)); } catch (e) {}
+    const lr = await getText('latest_run.txt'); if (lr && DATE_RE.test(lr.trim())) set.add(lr.trim());
+    const listing = await getText('');   // plain directory listing (python http.server, nginx autoindex, ...)
+    if (listing) for (const m of listing.matchAll(/href="(\d{4}-\d{2}-\d{2})\/?"/g)) set.add(m[1]);
+  }
+  return [...set].sort().reverse();
+}
+
+/* ---------- shared data ---------- */
+async function knownRoots() {
+  const raw = await load('subfinder_raw.jsonl', 'jsonl');
+  return [...new Set((raw || []).map(r => r.input).filter(Boolean))];
+}
+function rootOf(host, roots) {
+  const hit = roots.filter(r => host === r || host.endsWith('.' + r)).sort((a, b) => b.length - a.length)[0];
+  return hit || lastTwo(host);
+}
+const OS_RULES = [['Windows', /windows|win32|iis\b|active-directory|msexchange/], ['Linux', /linux|ubuntu|debian|centos|redhat|rhel/], ['macOS', /macos|osx|darwin/], ['Unix', /\bunix\b|solaris|freebsd|openbsd/]];
+async function getFindings() {
+  if ('_f' in S.cache) return S.cache._f;
+  let raw = await load('findings_combined.jsonl', 'jsonl');
+  if (!raw) {
+    const a = await load('nuclei_raw.jsonl', 'jsonl'), b = await load('takeover_raw.jsonl', 'jsonl');
+    raw = a || b ? [...(a || []), ...(b || [])] : null;
+  }
+  if (!raw) return (S.cache._f = null);
+  const seen = new Set(), rows = [];
+  for (const r of raw) {
+    const info = r.info || {};
+    const key = [r['template-id'], r['matched-at'] || r.host, r['matcher-name']].join('|');
+    if (seen.has(key)) continue; seen.add(key);          // takeover pass can repeat severity-scan hits
+    const tags = (Array.isArray(info.tags) ? info.tags : String(info.tags || '').split(',')).map(t => t.trim().toLowerCase()).filter(Boolean);
+    const hay = (tags.join(' ') + ' ' + (r['template-id'] || '') + ' ' + (info.name || '')).toLowerCase();
+    const os = OS_RULES.filter(([, re]) => re.test(hay)).map(x => x[0]);
+    rows.push({
+      sev: String(info.severity || 'unknown').toLowerCase(), name: info.name || r['template-id'] || '', tid: r['template-id'] || '',
+      host: r.host || '', matched: r['matched-at'] || r.matched || r.host || '', type: r.type || '', tags, os: os.length ? os : ['Not specified'],
+      ts: r.timestamp || '', desc: info.description || '', refs: arr(info.reference), matcher: r['matcher-name'] || '',
+      extracted: arr(r['extracted-results']), curl: r['curl-command'] || '', ip: r.ip || '', raw: r
+    });
+  }
+  return (S.cache._f = rows);
+}
+
+/* ---------- generic table engine ---------- */
+function renderTable(root, id, cfg, rows, hooks = {}) {
+  const ui = S.ui[id] ||= { q: '', f: {}, page: 0 };
+  if (!('sort' in ui)) ui.sort = cfg.sort || null;
+  root.innerHTML = `
+    <div class="bar">
+      <input type="search" class="q" placeholder="${esc(cfg.ph || 'Search…')}" value="${esc(ui.q)}" aria-label="Search">
+      <span class="fbox"></span>
+      <button class="ghost clr">Clear</button>
+      <span class="grow"></span><span class="count"></span>
+      <button class="ghost csv">Export CSV</button>
+    </div>
+    ${cfg.note ? `<div class="note">${cfg.note}</div>` : ''}
+    <div class="tw"><table><thead><tr>${cfg.cols.map((c, i) => `<th data-i="${i}">${esc(c.h)}<span class="ar"></span></th>`).join('')}</tr></thead><tbody></tbody></table></div>
+    <div class="pager"></div>`;
+  const q = $('.q', root), fbox = $('.fbox', root), tbody = $('tbody', root), pager = $('.pager', root), count = $('.count', root);
+  const filters = cfg.filters || [];
+  const vals = (f, r) => { const a = arr(f.get(r)).map(v => v === '' || v == null ? '(none)' : String(v)); return a.length ? a : ['(none)']; };
+  let out = [];
+
+  function buildFilters() {
+    fbox.innerHTML = '';
+    for (const f of filters) {
+      const m = new Map();
+      for (const r of rows) for (const v of vals(f, r)) m.set(v, (m.get(v) || 0) + 1);
+      const keys = [...m.keys()];
+      if (f.order) { const rk = k => { const i = f.order.indexOf(k); return i < 0 ? 99 : i; }; keys.sort((a, b) => rk(a) - rk(b)); }
+      else if (f.num) keys.sort((a, b) => a - b);
+      else keys.sort((a, b) => m.get(b) - m.get(a) || String(a).localeCompare(String(b)));
+      const sel = document.createElement('select');
+      sel.setAttribute('aria-label', f.label);
+      sel.innerHTML = `<option value="">${esc(f.label)}: all</option>` + keys.map(k => `<option value="${esc(k)}">${esc(k)} (${m.get(k)})</option>`).join('');
+      sel.value = ui.f[f.id] || '';
+      if (sel.value !== (ui.f[f.id] || '')) ui.f[f.id] = '';
+      sel.onchange = () => { ui.f[f.id] = sel.value; ui.page = 0; apply(); };
+      fbox.append(sel);
+    }
+  }
+
+  function apply() {
+    const terms = ui.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    out = rows.filter(r => {
+      for (const f of filters) { const w = ui.f[f.id]; if (w && !vals(f, r).includes(w)) return false; }
+      if (terms.length) { const s = r._s ??= cfg.search(r).toLowerCase(); if (!terms.every(t => s.includes(t))) return false; }
+      return true;
+    });
+    if (ui.sort) {
+      const c = cfg.cols[ui.sort.i], g = c.sort || c.get, d = ui.sort.dir;
+      out = [...out].sort((a, b) => {
+        let x = g(a), y = g(b); x ??= ''; y ??= '';
+        const r = typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), undefined, { numeric: true });
+        return r * d;
+      });
+    }
+    const pages = Math.max(1, Math.ceil(out.length / PAGE));
+    ui.page = Math.min(ui.page, pages - 1);
+    const start = ui.page * PAGE, slice = out.slice(start, start + PAGE);
+    tbody.innerHTML = slice.length ? slice.map((r, i) =>
+      `<tr data-i="${start + i}" class="${cfg.detail ? 'clk' : ''}">${cfg.cols.map(c => `<td class="${c.cls || ''}">${c.html ? c.html(r) : esc(arr(c.get(r)).join(', '))}</td>`).join('')}</tr>`).join('')
+      : `<tr><td colspan="${cfg.cols.length}" class="no" style="text-align:center;padding:26px">No rows match.</td></tr>`;
+    count.textContent = `${out.length.toLocaleString()} of ${rows.length.toLocaleString()}`;
+    pager.innerHTML = out.length > PAGE
+      ? `<span>${start + 1}–${Math.min(start + PAGE, out.length)} of ${out.length.toLocaleString()}</span><button class="ghost pp" ${ui.page === 0 ? 'disabled' : ''}>Prev</button><span>Page ${ui.page + 1}/${pages}</span><button class="ghost np" ${ui.page >= pages - 1 ? 'disabled' : ''}>Next</button>` : '';
+    root.querySelectorAll('th').forEach(th => { const i = +th.dataset.i; $('.ar', th).textContent = ui.sort && ui.sort.i === i ? (ui.sort.dir > 0 ? '▲' : '▼') : ''; });
+  }
+
+  let t; q.addEventListener('input', () => { clearTimeout(t); t = setTimeout(() => { ui.q = q.value; ui.page = 0; apply(); }, 120); });
+  $('.clr', root).onclick = () => { ui.q = ''; ui.f = {}; ui.page = 0; q.value = ''; buildFilters(); apply(); };
+  $('thead', root).onclick = e => {
+    const th = e.target.closest('th'); if (!th) return; const i = +th.dataset.i;
+    ui.sort = ui.sort && ui.sort.i === i ? { i, dir: -ui.sort.dir } : { i, dir: 1 }; apply();
+  };
+  pager.onclick = e => { if (e.target.closest('.pp')) ui.page--; else if (e.target.closest('.np')) ui.page++; else return; apply(); root.scrollIntoView({ block: 'start' }); };
+  tbody.onclick = e => {
+    if (!cfg.detail || e.target.closest('a')) return;
+    const tr = e.target.closest('tr[data-i]'); if (!tr) return;
+    const nxt = tr.nextElementSibling;
+    if (nxt && nxt.classList.contains('dt')) { nxt.remove(); return; }
+    const d = document.createElement('tr'); d.className = 'dt';
+    d.innerHTML = `<td colspan="${cfg.cols.length}">${cfg.detail(out[+tr.dataset.i])}</td>`; tr.after(d);
+  };
+  $('.csv', root).onclick = () => {
+    const cell = v => { v = arr(v).join(' | '); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    const csv = [cfg.cols.map(c => cell(c.h)).join(',')].concat(out.map(r => cfg.cols.map(c => cell(c.get(r))).join(','))).join('\n');
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = `${id}_${S.run}.csv`; a.click();
+  };
+  buildFilters(); apply();
+  return { refresh() { buildFilters(); apply(); } };
+}
+const missing = f => `<div class="empty">No <code>${esc(f)}</code> in this run. The step was probably skipped (tool not installed or no input from the previous step) — check <code>logs/web_network_scan.log</code>.</div>`;
+
+/* ---------- tabs ---------- */
+const TABS = {};
+
+TABS.overview = async root => {
+  const m = await getManifest(S.run);
+  const prev = S.runs[S.runs.indexOf(S.run) + 1], pm = prev ? await getManifest(prev) : null;
+  const defs = [['Subdomains','subdomains','subdomains',['all_subdomains.txt','lines']], ['Resolved hosts','dns','resolved_hosts',['resolved_hosts.txt','lines']],
+    ['Live web assets','web','live_urls',['live_urls.txt','lines']], ['Open ports','ports','open_ports',['naabu_raw.jsonl','jsonl']],
+    ['Findings','nuclei','findings',['findings_combined.jsonl','jsonl']], ['Dir-fuzz hits','ffuf','dir_fuzz_hits',['ffuf_combined.jsonl','jsonl']],
+    ['Dangling DNS','takeover','dangling_dns',['dangling_dns.txt','lines']], ['Screenshots','shots','screenshots',['screenshots_index.json','json']]];
+  let cards = '';
+  for (const [label, tab, key, src] of defs) {
+    let v = m && typeof m[key] === 'number' ? m[key] : (await load(...src) || []).length;
+    const dv = pm && typeof pm[key] === 'number' ? v - pm[key] : null;
+    cards += `<button class="card" data-go="${tab}"><div class="v">${v.toLocaleString()}</div><div class="l">${label}</div>
+      <div class="d ${dv > 0 ? 'up' : dv < 0 ? 'down' : ''}">${dv == null ? '&nbsp;' : dv === 0 ? 'no change vs ' + prev : (dv > 0 ? '+' : '') + dv + ' vs ' + prev}</div></button>`;
+  }
+  const finds = await getFindings(), ports = await load('naabu_raw.jsonl', 'jsonl'), web = await load('httpx_raw.jsonl', 'jsonl');
+  const count = (list, fn) => { const m = new Map(); list.forEach(x => arr(fn(x)).forEach(k => k !== '' && k != null && m.set(String(k), (m.get(String(k)) || 0) + 1))); return m; };
+  const bars = (title, m, tab, fid, order, top = 8) => {
+    let e = [...m.entries()]; e = order ? e.sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0])) : e.sort((a, b) => b[1] - a[1]); e = e.slice(0, top);
+    const max = Math.max(1, ...e.map(x => x[1]));
+    return `<div class="box"><h2>${title}</h2>${e.length ? e.map(([k, n]) => `<div class="brow" data-go="${tab}" data-f="${fid}" data-v="${esc(k)}"><span class="nm">${esc(k)}</span><span class="t"><i style="width:${n / max * 100}%"></i></span><span class="c">${n}</span></div>`).join('') : '<span class="no">No data</span>'}</div>`;
+  };
+  // run history: counts from each run's manifest
+  const hist = await Promise.all(S.runs.map(async d => [d, await getManifest(d)]));
+  const histRows = hist.map(([d, mm]) => `<tr class="clk" data-run="${d}"><td class="mono">${d}${d === S.run ? ' (viewing)' : ''}</td>${['subdomains','live_urls','open_ports','findings','dir_fuzz_hits','dangling_dns'].map(k => `<td>${mm ? mm[k] ?? '' : '–'}</td>`).join('')}</tr>`).join('');
+  root.innerHTML = `<div class="cards">${cards}</div>
+    <div class="grid2">
+      ${finds ? bars('Findings by severity', count(finds, r => r.sev), 'nuclei', 'sev', SEV) : `<div class="box"><h2>Findings by severity</h2><span class="no">No findings file</span></div>`}
+      ${ports ? bars('Most common open ports', count(ports, r => r.port), 'ports', 'port') : ''}
+      ${web ? bars('Top technologies', count(web, r => r.tech || r.technologies), 'web', 'tech') : ''}
+      ${web ? bars('HTTP status codes', count(web, r => r.status_code), 'web', 'code') : ''}
+    </div>
+    <div class="box"><h2>All runs — click to open</h2><div class="tw" style="border:0"><table><thead><tr><th>Run</th><th>Subdomains</th><th>Live web</th><th>Open ports</th><th>Findings</th><th>Dir-fuzz</th><th>Dangling</th></tr></thead><tbody>${histRows}</tbody></table></div></div>`;
+  root.onclick = e => {
+    const r = e.target.closest('[data-run]'); if (r) return setRun(r.dataset.run);
+    const g = e.target.closest('[data-go]'); if (!g) return;
+    if (g.dataset.f) S.ui[g.dataset.go] = { q: '', f: { [g.dataset.f]: g.dataset.v }, page: 0 };
+    setTab(g.dataset.go);
+  };
+};
+
+TABS.subdomains = async root => {
+  const [raw, all, resolved] = await Promise.all([load('subfinder_raw.jsonl', 'jsonl'), load('all_subdomains.txt', 'lines'), load('resolved_hosts.txt', 'lines')]);
+  if (!raw && !all && !resolved) return root.innerHTML = missing('all_subdomains.txt');
+  const roots = await knownRoots(), res = new Set(resolved || []), m = new Map();
+  const base = h => m.get(h) || (m.set(h, { host: h, sources: new Set(), origin: 'Passive (subfinder / chaos)' }), m.get(h));
+  for (const r of raw || []) if (r.host) arr(r.source).forEach(s => base(r.host.toLowerCase()).sources.add(s)), base(r.host.toLowerCase());
+  for (const h of all || []) base(h);
+  for (const h of resolved || []) if (!m.has(h)) { const e = base(h); e.origin = 'Permutation (alterx)'; e.sources.add('alterx'); }
+  const rows = [...m.values()].map(e => ({ ...e, sources: [...e.sources], domain: rootOf(e.host, roots), resolved: resolved ? (res.has(e.host) ? 'Yes' : 'No') : 'Unknown' }));
+  renderTable(root, 'subdomains', {
+    ph: 'Search hostnames…', sort: { i: 0, dir: 1 },
+    cols: [{ h: 'Hostname', get: r => r.host, cls: 'mono' }, { h: 'Domain', get: r => r.domain }, { h: 'Resolves', get: r => r.resolved, html: r => yesNo(r.resolved) },
+      { h: 'Origin', get: r => r.origin }, { h: 'Sources', get: r => r.sources, html: r => chips(r.sources) }],
+    filters: [{ id: 'domain', label: 'Domain', get: r => r.domain }, { id: 'res', label: 'Resolves', get: r => r.resolved }, { id: 'origin', label: 'Origin', get: r => r.origin }, { id: 'src', label: 'Source', get: r => r.sources }],
+    search: r => r.host + ' ' + r.sources.join(' ')
+  }, rows);
+};
+
+TABS.dns = async root => {
+  const raw = await load('dnsx_raw.jsonl', 'jsonl'); if (!raw) return root.innerHTML = missing('dnsx_raw.jsonl');
+  const rows = raw.map(r => ({ host: r.host || '', a: arr(r.a), aaaa: arr(r.aaaa), cname: arr(r.cname), status: r.status_code || '', raw: r }));
+  renderTable(root, 'dns', {
+    ph: 'Search host, IP or CNAME…', sort: { i: 0, dir: 1 },
+    cols: [{ h: 'Host', get: r => r.host, cls: 'mono' }, { h: 'A', get: r => r.a, html: r => r.a.map(esc).join('<br>'), cls: 'mono' },
+      { h: 'AAAA', get: r => r.aaaa, html: r => r.aaaa.map(esc).join('<br>'), cls: 'mono' }, { h: 'CNAME', get: r => r.cname, html: r => r.cname.map(esc).join('<br>'), cls: 'mono' }, { h: 'Status', get: r => r.status }],
+    filters: [{ id: 'rec', label: 'Record type', get: r => [r.a.length && 'A', r.aaaa.length && 'AAAA', r.cname.length && 'CNAME'].filter(Boolean) },
+      { id: 'cn', label: 'CNAME target', get: r => r.cname.map(c => lastTwo(c.replace(/\.$/, ''))) }, { id: 'st', label: 'Status', get: r => r.status }],
+    search: r => [r.host, ...r.a, ...r.aaaa, ...r.cname].join(' ')
+  }, rows);
+};
+
+TABS.cdn = async root => {
+  const raw = await load('cdncheck_raw.jsonl', 'jsonl'); if (!raw) return root.innerHTML = missing('cdncheck_raw.jsonl');
+  const rows = raw.map(r => ({
+    input: r.input || r.host || '', ip: r.ip || '', provider: r.cdn_name || r.cloud_name || r.waf_name || r.name || '',
+    type: r.type || r.itemType || (r.cdn ? 'cdn' : r.cloud ? 'cloud' : r.waf ? 'waf' : ''), raw: r
+  }));
+  renderTable(root, 'cdn', {
+    ph: 'Search host or provider…', sort: { i: 0, dir: 1 }, detail: r => pretty(r.raw),
+    cols: [{ h: 'Input', get: r => r.input, cls: 'mono' }, { h: 'IP', get: r => r.ip, cls: 'mono' }, { h: 'Type', get: r => r.type }, { h: 'Provider', get: r => r.provider }],
+    filters: [{ id: 'type', label: 'Type', get: r => r.type }, { id: 'prov', label: 'Provider', get: r => r.provider }],
+    search: r => `${r.input} ${r.ip} ${r.type} ${r.provider}`
+  }, rows);
+};
+
+TABS.web = async root => {
+  const raw = await load('httpx_raw.jsonl', 'jsonl'); if (!raw) return root.innerHTML = missing('httpx_raw.jsonl');
+  const rows = raw.map(r => ({
+    url: r.url || r.input || '', title: r.title || '', code: r.status_code ?? '', server: r.webserver || '', tech: arr(r.tech || r.technologies),
+    ip: r.host_ip || (arr(r.a)[0]) || r.host || '', cdn: r.cdn_name || (r.cdn ? 'yes' : ''), scheme: r.scheme || '', len: r.content_length ?? '', raw: r
+  }));
+  renderTable(root, 'web', {
+    ph: 'Search URL, title, tech, server…', sort: { i: 0, dir: 1 }, detail: r => pretty(r.raw),
+    cols: [{ h: 'URL', get: r => r.url, html: r => link(r.url), cls: 'mono' }, { h: 'Title', get: r => r.title }, { h: 'Status', get: r => r.code === '' ? 0 : r.code, html: r => stBadge(r.code) },
+      { h: 'Server', get: r => r.server }, { h: 'Technology', get: r => r.tech, html: r => chips(r.tech) }, { h: 'IP', get: r => r.ip, cls: 'mono' }, { h: 'CDN', get: r => r.cdn }],
+    filters: [{ id: 'cls', label: 'Status class', get: r => r.code === '' ? '' : Math.floor(r.code / 100) + 'xx' }, { id: 'code', label: 'Status code', get: r => r.code },
+      { id: 'tech', label: 'Technology', get: r => r.tech }, { id: 'srv', label: 'Server', get: r => r.server }, { id: 'cdn', label: 'CDN', get: r => r.cdn }, { id: 'sch', label: 'Scheme', get: r => r.scheme }],
+    search: r => `${r.url} ${r.title} ${r.server} ${r.tech.join(' ')} ${r.ip} ${r.cdn}`
+  }, rows);
+};
+
+TABS.ports = async root => {
+  const raw = await load('naabu_raw.jsonl', 'jsonl'); if (!raw) return root.innerHTML = missing('naabu_raw.jsonl');
+  const dns = await load('dnsx_raw.jsonl', 'jsonl'), ipHosts = new Map();
+  for (const r of dns || []) for (const ip of [...arr(r.a), ...arr(r.aaaa)]) { if (!ipHosts.has(ip)) ipHosts.set(ip, new Set()); ipHosts.get(ip).add(r.host); }
+  const byKey = new Map();
+  const rows = raw.map(r => {
+    const ip = r.ip || r.host || '', row = { ip, port: r.port, proto: r.protocol || 'tcp', hosts: [...(ipHosts.get(ip) || [])].sort(), service: '', version: '' };
+    byKey.set(ip + ':' + r.port, row); return row;
   });
-  $('#globalSearch').addEventListener('input', () => renderActiveTab());
+  const run = S.run;
+  const api = renderTable(root, 'ports', {
+    ph: 'Search IP, hostname, port, service…', sort: { i: 1, dir: 1 },
+    note: '<span id="nmapStatus">Loading nmap service detection…</span>',
+    cols: [{ h: 'IP', get: r => r.ip, cls: 'mono' }, { h: 'Port', get: r => r.port }, { h: 'Proto', get: r => r.proto },
+      { h: 'Service', get: r => r.service, html: r => esc(r.service) || '<span class="no">–</span>' }, { h: 'Version', get: r => r.version },
+      { h: 'Hostnames', get: r => r.hosts, html: r => r.hosts.slice(0, 4).map(chip).join('') + (r.hosts.length > 4 ? ` <span class="no">+${r.hosts.length - 4}</span>` : '') }],
+    filters: [{ id: 'port', label: 'Port', get: r => r.port, num: true }, { id: 'svc', label: 'Service', get: r => r.service }, { id: 'ip', label: 'IP', get: r => r.ip }],
+    search: r => `${r.ip} ${r.port} ${r.proto} ${r.service} ${r.version} ${r.hosts.join(' ')}`
+  }, rows);
+  // enrich from nmap_<ip>.xml files (one per IP, written by the scan script)
+  const ips = [...new Set(rows.map(r => r.ip))], queue = [...ips], st = $('#nmapStatus', root) || { textContent: '' };
+  let done = 0, found = 0;
+  const worker = async () => {
+    while (queue.length) {
+      const ip = queue.shift(), t = await getText(`${run}/nmap_${ip.replace(/:/g, '_')}.xml`); done++;
+      if (run !== S.run) return;
+      if (t) {
+        found++;
+        new DOMParser().parseFromString(t, 'text/xml').querySelectorAll('port').forEach(p => {
+          const row = byKey.get(ip + ':' + p.getAttribute('portid')), s = p.querySelector('service'); if (!row || !s) return;
+          row.service = s.getAttribute('name') || '';
+          row.version = [s.getAttribute('product'), s.getAttribute('version'), s.getAttribute('extrainfo')].filter(Boolean).join(' '); delete row._s;
+        });
+      }
+      st.textContent = `Service detection: ${found} of ${ips.length} IPs have nmap data${done < ips.length ? ' (loading…)' : ''}`;
+    }
+  };
+  Promise.all(Array.from({ length: 6 }, worker)).then(() => { if (run === S.run) { st.textContent = `Service detection: ${found} of ${ips.length} IPs have nmap data`; api.refresh(); } });
+};
 
-  let dates = [];
-  try {
-    const r = await fetch('runs_index.json', { cache: 'no-store' });
-    if (r.ok) dates = await r.json();
-  } catch (e) { /* no index yet */ }
+TABS.tls = async root => {
+  const raw = await load('tlsx_raw.jsonl', 'jsonl'); if (!raw) return root.innerHTML = missing('tlsx_raw.jsonl');
+  const now = Date.parse(S.run + 'T00:00:00Z');
+  const rows = raw.map(r => {
+    const days = r.not_after ? Math.floor((Date.parse(r.not_after) - now) / 864e5) : NaN;
+    const bucket = isNaN(days) ? 'Unknown' : days < 0 ? 'Expired' : days <= 30 ? '≤ 30 days' : days <= 90 ? '31–90 days' : '> 90 days';
+    return { host: r.host || r.input || r.ip || '', port: r.port || '', ver: r.tls_version || '', cipher: r.cipher || '', issuer: r.issuer_cn || r.issuer_org?.[0] || '',
+      cn: r.subject_cn || '', after: r.not_after ? String(r.not_after).slice(0, 10) : '', days, bucket, san: arr(r.subject_an),
+      flags: ['expired', 'self_signed', 'mismatched', 'revoked', 'untrusted'].filter(k => r[k]).map(k => k.replace('_', '-')), raw: r };
+  });
+  renderTable(root, 'tls', {
+    ph: 'Search host, CN, issuer, SAN…', sort: { i: 6, dir: 1 }, detail: r => `<dl class="kv"><dt>SANs</dt><dd>${chips(r.san) || '–'}</dd><dt>Cipher</dt><dd>${esc(r.cipher)}</dd></dl>${pretty(r.raw)}`,
+    cols: [{ h: 'Host', get: r => r.host, cls: 'mono' }, { h: 'Port', get: r => r.port }, { h: 'TLS', get: r => r.ver }, { h: 'Subject CN', get: r => r.cn }, { h: 'Issuer', get: r => r.issuer },
+      { h: 'Expires', get: r => r.after }, { h: 'Days left', get: r => isNaN(r.days) ? 99999 : r.days, html: r => isNaN(r.days) ? '' : `<span class="${r.days < 0 ? 'bad' : r.days <= 30 ? 'warn' : ''}">${r.days}</span>` },
+      { h: 'Flags', get: r => r.flags, html: r => r.flags.map(f => `<span class="bad">${esc(f)}</span>`).join(' ') }],
+    filters: [{ id: 'exp', label: 'Expiry', get: r => r.bucket, order: ['Expired', '≤ 30 days', '31–90 days', '> 90 days', 'Unknown'] }, { id: 'ver', label: 'TLS version', get: r => r.ver },
+      { id: 'iss', label: 'Issuer', get: r => r.issuer }, { id: 'flag', label: 'Flag', get: r => r.flags }],
+    search: r => `${r.host} ${r.cn} ${r.issuer} ${r.ver} ${r.san.join(' ')}`
+  }, rows);
+};
 
-  let latest = null;
-  try {
-    const r = await fetch('latest_run.txt', { cache: 'no-store' });
-    if (r.ok) latest = (await r.text()).trim();
-  } catch (e) { /* ignore */ }
+TABS.crawl = async root => {
+  const raw = await load('katana_raw.jsonl', 'jsonl'); if (!raw) return root.innerHTML = missing('katana_raw.jsonl');
+  const rows = [];
+  for (const r of raw) {
+    const url = r.request?.endpoint || r.url; if (!url) continue;
+    let host = '', ext = '(none)'; try { const u = new URL(url); host = u.host; const m = u.pathname.match(/\.([a-z0-9]{1,5})$/i); if (m) ext = m[1].toLowerCase(); } catch (e) {}
+    rows.push({ url, host, ext, method: r.request?.method || '', code: r.response?.status_code ?? '', source: r.request?.source || '', params: url.includes('?') ? 'Yes' : 'No' });
+  }
+  renderTable(root, 'crawl', {
+    ph: 'Search crawled URLs…', sort: { i: 0, dir: 1 },
+    cols: [{ h: 'URL', get: r => r.url, html: r => link(r.url), cls: 'mono' }, { h: 'Method', get: r => r.method }, { h: 'Status', get: r => r.code === '' ? 0 : r.code, html: r => stBadge(r.code) },
+      { h: 'Found on', get: r => r.source, html: r => link(r.source), cls: 'mono' }],
+    filters: [{ id: 'host', label: 'Host', get: r => r.host }, { id: 'm', label: 'Method', get: r => r.method }, { id: 'code', label: 'Status', get: r => r.code },
+      { id: 'ext', label: 'Extension', get: r => r.ext }, { id: 'p', label: 'Has parameters', get: r => r.params }],
+    search: r => r.url
+  }, rows);
+};
 
-  if (!dates.length && latest) dates = [latest];
-  if (!dates.length) {
-    contentEl.innerHTML = `<div class="empty">No runs found yet. Run <code>web_network_scan.sh</code> at least once, then reload this page.</div>`;
+TABS.ffuf = async root => {
+  const raw = await load('ffuf_combined.jsonl', 'jsonl'); if (!raw) return root.innerHTML = missing('ffuf_combined.jsonl');
+  const rows = raw.map(r => ({ host: String(r.host || '').replace(/\/FUZZ$/, ''), url: r.url || '', code: r.status ?? '', len: r.length ?? 0, words: r.words ?? 0, lines: r.lines ?? 0 }));
+  renderTable(root, 'ffuf', {
+    ph: 'Search discovered paths…', sort: { i: 0, dir: 1 },
+    cols: [{ h: 'URL', get: r => r.url, html: r => link(r.url), cls: 'mono' }, { h: 'Status', get: r => r.code, html: r => stBadge(r.code) }, { h: 'Length', get: r => +r.len }, { h: 'Words', get: r => +r.words }, { h: 'Lines', get: r => +r.lines }, { h: 'Scanned base', get: r => r.host, cls: 'mono' }],
+    filters: [{ id: 'code', label: 'Status', get: r => r.code }, { id: 'host', label: 'Host', get: r => r.host }],
+    search: r => `${r.url} ${r.code}`
+  }, rows);
+};
+
+TABS.nuclei = async root => {
+  const rows = await getFindings(); if (!rows) return root.innerHTML = missing('findings_combined.jsonl');
+  renderTable(root, 'nuclei', {
+    ph: 'Search name, template, host, tag, description…', sort: { i: 0, dir: -1 },
+    note: 'OS is inferred from template tags/IDs (nuclei does not record the target OS); “Not specified” means the template is OS-agnostic. Click a row for details.',
+    cols: [{ h: 'Severity', get: r => SEV.length - SEV.indexOf(r.sev), html: r => sevBadge(r.sev) }, { h: 'Finding', get: r => r.name }, { h: 'Template', get: r => r.tid, cls: 'mono' },
+      { h: 'Matched at', get: r => r.matched, html: r => link(r.matched), cls: 'mono' }, { h: 'Type', get: r => r.type }, { h: 'OS', get: r => r.os, html: r => chips(r.os) }, { h: 'Tags', get: r => r.tags, html: r => chips(r.tags.slice(0, 5)) }],
+    filters: [{ id: 'sev', label: 'Severity', get: r => r.sev, order: SEV }, { id: 'os', label: 'OS', get: r => r.os }, { id: 'type', label: 'Type', get: r => r.type },
+      { id: 'host', label: 'Host', get: r => r.host }, { id: 'tag', label: 'Tag', get: r => r.tags }, { id: 'tpl', label: 'Template', get: r => r.tid }],
+    detail: r => `<dl class="kv"><dt>Severity</dt><dd>${sevBadge(r.sev)}</dd><dt>Template</dt><dd class="mono">${esc(r.tid)}</dd><dt>Matched at</dt><dd class="mono">${link(r.matched)}</dd>
+      <dt>IP</dt><dd class="mono">${esc(r.ip) || '–'}</dd><dt>Matcher</dt><dd>${esc(r.matcher) || '–'}</dd><dt>Time</dt><dd>${esc(r.ts) || '–'}</dd>
+      <dt>Description</dt><dd>${esc(r.desc) || '–'}</dd><dt>References</dt><dd>${r.refs.map(x => link(x)).join('<br>') || '–'}</dd>
+      <dt>Extracted</dt><dd class="mono">${r.extracted.map(esc).join('<br>') || '–'}</dd></dl>${r.curl ? `<pre>${esc(r.curl)}</pre>` : ''}`,
+    search: r => `${r.name} ${r.tid} ${r.host} ${r.matched} ${r.tags.join(' ')} ${r.os.join(' ')} ${r.desc} ${r.matcher} ${r.sev}`
+  }, rows);
+};
+
+TABS.takeover = async root => {
+  const [tk, dang, dns] = await Promise.all([load('takeover_raw.jsonl', 'jsonl'), load('dangling_dns.txt', 'lines'), load('dnsx_raw.jsonl', 'jsonl')]);
+  if (!tk && !dang) return root.innerHTML = missing('dangling_dns.txt');
+  const refBy = new Map();
+  for (const r of dns || []) for (const c of arr(r.cname)) { const k = c.replace(/\.$/, ''); if (!refBy.has(k)) refBy.set(k, []); refBy.get(k).push(r.host); }
+  const rows = [];
+  for (const r of tk || []) rows.push({ kind: 'Takeover finding', value: r.host || r['matched-at'] || '', detail: (r.info?.name || r['template-id'] || ''), sev: String(r.info?.severity || 'unknown').toLowerCase(), refs: [] });
+  for (const d of dang || []) rows.push({ kind: 'Dangling CNAME target', value: d, detail: 'CNAME target does not resolve', sev: '', refs: refBy.get(d.replace(/\.$/, '')) || [] });
+  renderTable(root, 'takeover', {
+    ph: 'Search host or CNAME target…',
+    note: 'Dangling CNAME targets are DNS records pointing at names that no longer resolve — candidates for subdomain takeover. “Referenced by” shows which of your hostnames point at them.',
+    cols: [{ h: 'Type', get: r => r.kind }, { h: 'Value', get: r => r.value, cls: 'mono' }, { h: 'Detail', get: r => r.detail }, { h: 'Severity', get: r => r.sev, html: r => r.sev ? sevBadge(r.sev) : '' },
+      { h: 'Referenced by', get: r => r.refs, html: r => r.refs.slice(0, 5).map(chip).join('') + (r.refs.length > 5 ? ` +${r.refs.length - 5}` : '') }],
+    filters: [{ id: 'kind', label: 'Type', get: r => r.kind }, { id: 'sev', label: 'Severity', get: r => r.sev, order: SEV }],
+    search: r => `${r.kind} ${r.value} ${r.detail} ${r.refs.join(' ')}`
+  }, rows);
+};
+
+TABS.shots = async root => {
+  const idx = await load('screenshots_index.json', 'json'); if (!idx) return root.innerHTML = missing('screenshots_index.json');
+  const roots = await knownRoots();
+  const items = idx.map(n => ({ name: n, scheme: /^https/i.test(n) ? 'https' : /^http/i.test(n) ? 'http' : 'other', domain: roots.find(r => n.includes(r)) || 'other' }));
+  const ui = S.ui.shots ||= { q: '', f: {}, page: 0 }, PER = 48;
+  const opts = (key, label) => { const m = new Map(); items.forEach(i => m.set(i[key], (m.get(i[key]) || 0) + 1)); return `<select data-k="${key}" aria-label="${label}"><option value="">${label}: all</option>${[...m].map(([k, n]) => `<option value="${esc(k)}" ${ui.f[key] === k ? 'selected' : ''}>${esc(k)} (${n})</option>`).join('')}</select>`; };
+  root.innerHTML = `<div class="bar"><input type="search" class="q" placeholder="Search screenshot file names…" value="${esc(ui.q)}">${opts('domain', 'Domain')}${opts('scheme', 'Scheme')}<button class="ghost clr">Clear</button><span class="grow"></span><span class="count"></span></div><div class="gal"></div><div class="pager"></div>`;
+  const gal = $('.gal', root), pager = $('.pager', root);
+  function apply() {
+    const terms = ui.q.toLowerCase().split(/\s+/).filter(Boolean);
+    const out = items.filter(i => (!ui.f.domain || i.domain === ui.f.domain) && (!ui.f.scheme || i.scheme === ui.f.scheme) && terms.every(t => i.name.toLowerCase().includes(t)));
+    const pages = Math.max(1, Math.ceil(out.length / PER)); ui.page = Math.min(ui.page, pages - 1);
+    gal.innerHTML = out.slice(ui.page * PER, ui.page * PER + PER).map(i => `<div class="shot" data-n="${esc(i.name)}"><img loading="lazy" src="${esc(assetUrl(S.run + '/screenshots/' + i.name))}" alt=""><div class="mono">${esc(i.name.replace(/\.png$/, ''))}</div></div>`).join('') || '<div class="empty" style="grid-column:1/-1">No screenshots match.</div>';
+    $('.count', root).textContent = `${out.length} of ${items.length}`;
+    pager.innerHTML = out.length > PER ? `<button class="ghost pp" ${ui.page === 0 ? 'disabled' : ''}>Prev</button><span>Page ${ui.page + 1}/${pages}</span><button class="ghost np" ${ui.page >= pages - 1 ? 'disabled' : ''}>Next</button>` : '';
+  }
+  let t; $('.q', root).oninput = e => { clearTimeout(t); t = setTimeout(() => { ui.q = e.target.value; ui.page = 0; apply(); }, 120); };
+  root.querySelectorAll('select').forEach(s => s.onchange = () => { ui.f[s.dataset.k] = s.value; ui.page = 0; apply(); });
+  $('.clr', root).onclick = () => { ui.q = ''; ui.f = {}; ui.page = 0; root.querySelectorAll('select').forEach(s => s.value = ''); $('.q', root).value = ''; apply(); };
+  pager.onclick = e => { if (e.target.closest('.pp')) ui.page--; else if (e.target.closest('.np')) ui.page++; else return; apply(); };
+  gal.onclick = e => { const s = e.target.closest('.shot'); if (!s) return; $('#lb img').src = assetUrl(S.run + '/screenshots/' + s.dataset.n); $('#lb').style.display = 'flex'; };
+  apply();
+};
+$('#lb').onclick = () => { $('#lb').style.display = 'none'; };
+document.addEventListener('keydown', e => { if (e.key === 'Escape') $('#lb').style.display = 'none'; });
+
+const TAB_LIST = [['overview', 'Overview'], ['subdomains', 'Subdomains'], ['dns', 'DNS'], ['cdn', 'CDN / WAF'], ['web', 'Web'], ['ports', 'Ports'], ['tls', 'TLS'],
+  ['crawl', 'Crawl'], ['ffuf', 'Dir fuzz'], ['nuclei', 'Nuclei'], ['takeover', 'Takeover & dangling DNS'], ['shots', 'Screenshots']];
+const BADGE = { subdomains: 'subdomains', dns: 'resolved_hosts', web: 'live_urls', ports: 'open_ports', nuclei: 'findings', ffuf: 'dir_fuzz_hits', takeover: 'dangling_dns', shots: 'screenshots' };
+
+/* ---------- shell ---------- */
+async function renderTabs() {
+  const m = S.run ? await getManifest(S.run) : null;
+  $('#tabs').innerHTML = TAB_LIST.map(([id, label]) => {
+    const n = m && BADGE[id] && typeof m[BADGE[id]] === 'number' ? `<span class="n">${m[BADGE[id]].toLocaleString()}</span>` : '';
+    return `<button class="tab ${id === S.tab ? 'on' : ''}" data-t="${id}">${esc(label)}${n}</button>`;
+  }).join('');
+  $('#runMeta').textContent = m ? '' : (S.run ? 'no manifest.json for this run' : '');
+}
+$('#tabs').onclick = e => { const b = e.target.closest('.tab'); if (b) setTab(b.dataset.t); };
+function hash() { history.replaceState(null, '', `#run=${S.run || ''}&tab=${S.tab}`); }
+function setTab(t) { S.tab = t; hash(); renderTabs(); show(); window.scrollTo(0, 0); }
+async function setRun(d) {
+  S.run = d; S.cache = {}; S.ui = {}; hash();
+  $('#runSel').value = d; syncArrows(); await renderTabs(); show();
+}
+function syncArrows() {
+  const i = S.runs.indexOf(S.run);
+  $('#prev').disabled = i < 0 || i >= S.runs.length - 1; $('#next').disabled = i <= 0;
+}
+async function show() {
+  const view = $('#view'), run = S.run, tab = S.tab;
+  if (!run) {
+    view.innerHTML = `<div class="empty"><b>No scan runs found.</b><br>Serve this file from your output folder, then reload:<br><code>cd ~/projects/asm/output &amp;&amp; python3 -m http.server 8080</code><br>…or click <b>Open output folder…</b> (top right) and pick the folder that contains the dated sub-folders.</div>`;
     return;
   }
-
-  const picker = $('#runPicker');
-  picker.innerHTML = dates.slice().reverse().map(d => `<option value="${d}">${d}</option>`).join('');
-  picker.value = latest && dates.includes(latest) ? latest : dates[dates.length - 1];
-  picker.addEventListener('change', () => loadRun(picker.value));
-
-  await loadRun(picker.value);
+  view.innerHTML = '<div class="empty">Loading…</div>';
+  const box = document.createElement('div');
+  try { await TABS[tab](box); } catch (e) { console.error(e); box.innerHTML = `<div class="empty">Could not render this tab: ${esc(e.message)}</div>`; }
+  if (run === S.run && tab === S.tab) view.replaceChildren(box);
 }
-
-async function loadRun(date) {
-  currentRunDate = date;
-  rowCache = {};
-  activeFilters = {};
-  await renderOverviewCards();
-  await switchTab(currentTab, true);
+async function init() {
+  S.runs = await discoverRuns(); S.manifests = {};
+  const sel = $('#runSel');
+  sel.innerHTML = S.runs.length ? S.runs.map((d, i) => `<option value="${d}">${d} (${weekday(d)})${i === 0 ? ' – latest' : ''}</option>`).join('') : '<option>no runs found</option>';
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (TABS[h.get('tab')]) S.tab = h.get('tab');
+  const want = h.get('run');
+  S.run = S.runs.includes(want) ? want : (S.runs[0] || null);
+  S.cache = {}; S.ui = {};
+  if (S.run) { sel.value = S.run; hash(); }
+  syncArrows(); await renderTabs(); show();
 }
-
-function switchTab(tabId, force) {
-  if (tabId === currentTab && !force) return;
-  currentTab = tabId;
-  [...tabsEl.children].forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
-  $('#globalSearch').value = '';
-  return renderActiveTab();
-}
-
-// ----------------------------------------------------------------------------
-// Fetch + parse helpers
-// ----------------------------------------------------------------------------
-async function fetchText(path) {
-  const r = await fetch(path, { cache: 'no-store' });
-  if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
-  return r.text();
-}
-
-function parseJSONL(text) {
-  return text.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
-    try { return JSON.parse(l); } catch (e) { return null; }
-  }).filter(Boolean);
-}
-
-function parseTxtLines(text) {
-  return text.split('\n').map(l => l.trim()).filter(Boolean).map(v => ({ value: v }));
-}
-
-// Flatten a dnsx line's a/aaaa/cname arrays into display strings
-function normalizeDnsRow(r) {
-  return {
-    host: r.host || '',
-    a: (r.a || []).join(', '),
-    aaaa: (r.aaaa || []).join(', '),
-    cname: (r.cname || []).join(', '),
-  };
-}
-
-function normalizePortRow(r) {
-  return { ip: r.ip || r.host || '', port: r.port != null ? r.port : '' };
-}
-
-function normalizeFindingRow(r) {
-  const info = r.info || {};
-  return {
-    severity: (info.severity || 'info').toLowerCase(),
-    'template-id': r['template-id'] || r.templateID || '',
-    host: r.host || '',
-    'matched-at': r['matched-at'] || r.matched_at || '',
-  };
-}
-
-async function loadTabRows(tab) {
-  if (rowCache[tab.id]) return rowCache[tab.id];
-  const path = `${currentRunDate}/${tab.file}`;
-  let rows = [];
-  try {
-    if (tab.type === 'images') {
-      const text = await fetchText(path);
-      const names = JSON.parse(text);
-      rows = names.map(n => ({ file: n, url: `${currentRunDate}/screenshots/${n}` }));
-    } else if (tab.type === 'txt') {
-      rows = parseTxtLines(await fetchText(path));
-    } else if (tab.type === 'jsonl-dns') {
-      rows = parseJSONL(await fetchText(path)).map(normalizeDnsRow);
-    } else if (tab.type === 'jsonl-ports') {
-      rows = parseJSONL(await fetchText(path)).map(normalizePortRow);
-    } else if (tab.type === 'jsonl-finding') {
-      rows = parseJSONL(await fetchText(path)).map(normalizeFindingRow);
-    } else {
-      rows = parseJSONL(await fetchText(path));
-    }
-  } catch (e) {
-    rows = [];
+$('#runSel').onchange = e => setRun(e.target.value);
+$('#prev').onclick = () => { const i = S.runs.indexOf(S.run); if (i < S.runs.length - 1) setRun(S.runs[i + 1]); };
+$('#next').onclick = () => { const i = S.runs.indexOf(S.run); if (i > 0) setRun(S.runs[i - 1]); };
+$('#pick').onclick = () => $('#folder').click();
+$('#folder').onchange = async e => {
+  const files = [...e.target.files]; if (!files.length) return;
+  fileMap = new Map(); S.blobs = {};
+  for (const f of files) {
+    const p = (f.webkitRelativePath || f.name).split('/'), i = p.findIndex(x => DATE_RE.test(x));
+    fileMap.set(i >= 0 ? p.slice(i).join('/') : p.slice(1).join('/'), f);   // works whether you pick output/ or a single dated folder
   }
-  rowCache[tab.id] = rows;
-  return rows;
-}
-
-// ----------------------------------------------------------------------------
-// Overview cards
-// ----------------------------------------------------------------------------
-async function renderOverviewCards() {
-  let m = {};
-  try {
-    m = JSON.parse(await fetchText(`${currentRunDate}/manifest.json`));
-  } catch (e) { /* manifest optional */ }
-  const labelMap = [
-    ['subdomains', 'Subdomains'], ['resolved_hosts', 'Resolved Hosts'],
-    ['live_urls', 'Live Web Assets'], ['open_ports', 'Open Ports'],
-    ['findings', 'Findings'], ['dir_fuzz_hits', 'Dir Fuzz Hits'],
-    ['dangling_dns', 'Dangling DNS'], ['screenshots', 'Screenshots'],
-  ];
-  cardsEl.innerHTML = labelMap.map(([k, l]) =>
-    `<div class="card"><div class="n">${m[k] != null ? m[k] : '–'}</div><div class="l">${l}</div></div>`
-  ).join('');
-}
-
-// ----------------------------------------------------------------------------
-// Rendering: generic table + generic filter row + search
-// ----------------------------------------------------------------------------
-async function renderActiveTab() {
-  if (currentTab === 'overview') return renderOverview();
-  const tab = TABS.find(t => t.id === currentTab);
-  if (!tab) return;
-  contentEl.innerHTML = `<div class="empty">Loading…</div>`;
-  const rows = await loadTabRows(tab);
-
-  if (tab.type === 'images') return renderGallery(tab, rows);
-  return renderTable(tab, rows);
-}
-
-function renderOverview() {
-  contentEl.innerHTML = `
-    <div class="empty" style="text-align:left; max-width:640px; margin:0 auto;">
-      <p style="font-size:14px; color:var(--text);">Run date: <b>${currentRunDate || '–'}</b></p>
-      <p>Pick a tab above for subdomains, DNS, open web assets, ports, TLS info,
-      crawled URLs, directory-fuzz hits, vulnerability/takeover findings,
-      dangling DNS candidates, or the screenshot gallery.</p>
-      <p>Use the search box (top right) to filter whatever tab is open across
-      every column at once. Some tabs also have a dropdown filter of their own
-      (severity, status code, port).</p>
-    </div>`;
-}
-
-function buildFilterBar(tab) {
-  if (!tab.filters || !tab.filters.length) return '';
-  activeFilters[tab.id] = activeFilters[tab.id] || {};
-  return tab.filters.map(f => {
-    if (f.kind === 'severity') {
-      const levels = ['critical', 'high', 'medium', 'low', 'info'];
-      const active = activeFilters[tab.id][f.key];
-      return `<div class="pill-toggle" data-filter-key="${f.key}">
-        <button data-val="" class="${!active ? 'active' : ''}">All</button>
-        ${levels.map(l => `<button data-val="${l}" class="${active === l ? 'active' : ''}">${l}</button>`).join('')}
-      </div>`;
-    }
-    if (f.kind === 'status') {
-      const buckets = [['2', '2xx'], ['3', '3xx'], ['4', '4xx'], ['5', '5xx']];
-      const active = activeFilters[tab.id][f.key];
-      return `<div class="pill-toggle" data-filter-key="${f.key}">
-        <button data-val="" class="${!active ? 'active' : ''}">All</button>
-        ${buckets.map(([v, l]) => `<button data-val="${v}" class="${active === v ? 'active' : ''}">${l}</button>`).join('')}
-      </div>`;
-    }
-    if (f.kind === 'text') {
-      return `<input type="text" placeholder="Filter by ${f.label.toLowerCase()}…"
-                data-filter-key="${f.key}" value="${activeFilters[tab.id][f.key] || ''}" style="min-width:140px;">`;
-    }
-    return '';
-  }).join('');
-}
-
-function matchesFilters(tab, row) {
-  const f = activeFilters[tab.id] || {};
-  for (const key in f) {
-    const val = f[key];
-    if (!val) continue;
-    const cell = String(row[key] ?? '');
-    if (key === 'status_code' || key === 'status') {
-      if (!cell.startsWith(val)) return false;
-    } else {
-      if (!cell.toLowerCase().includes(val.toLowerCase())) return false;
-    }
-  }
-  return true;
-}
-
-function matchesSearch(row, query) {
-  if (!query) return true;
-  const q = query.toLowerCase();
-  return Object.values(row).some(v => String(v ?? '').toLowerCase().includes(q));
-}
-
-function severityBadge(sev) {
-  const s = (sev || 'info').toLowerCase();
-  return `<span class="badge sev-${s}">${s}</span>`;
-}
-
-function statusClass(code) {
-  const s = String(code || '')[0];
-  return s ? `status-${s}` : '';
-}
-
-function cellValue(tab, col, row) {
-  const [key] = col;
-  const val = row[key];
-  if (key === 'severity') return severityBadge(val);
-  if ((key === 'status_code' || key === 'status') && val != null) {
-    return `<span class="${statusClass(val)}">${val}</span>`;
-  }
-  if ((key === 'url' || key === 'host') && val && /^https?:\/\//.test(val)) {
-    return `<a href="${val}" target="_blank" rel="noopener">${val}</a>`;
-  }
-  return val != null ? String(val) : '';
-}
-
-function renderTable(tab, rows) {
-  const query = $('#globalSearch').value;
-  const filterBar = buildFilterBar(tab);
-  const filtered = rows.filter(r => matchesFilters(tab, r) && matchesSearch(r, query));
-
-  contentEl.innerHTML = `
-    <div class="toolbar">
-      ${filterBar}
-      <span class="count">${filtered.length} / ${rows.length} rows</span>
-    </div>
-    ${filtered.length ? `
-    <table>
-      <thead><tr>${tab.columns.map(([k, l]) => `<th data-key="${k}">${l}</th>`).join('')}</tr></thead>
-      <tbody>${filtered.map(r => `<tr>${tab.columns.map(c => `<td>${cellValue(tab, c, r)}</td>`).join('')}</tr>`).join('')}</tbody>
-    </table>` : `<div class="empty">No rows match${rows.length ? ' the current filter/search' : ' — file may be empty or missing for this run'}.</div>`}
-  `;
-
-  contentEl.querySelectorAll('[data-filter-key]').forEach(el => {
-    if (el.tagName === 'INPUT') {
-      el.addEventListener('input', () => {
-        activeFilters[tab.id][el.dataset.filterKey] = el.value;
-        renderActiveTab();
-      });
-    } else {
-      el.querySelectorAll('button').forEach(btn => {
-        btn.addEventListener('click', () => {
-          activeFilters[tab.id][el.dataset.filterKey] = btn.dataset.val;
-          renderActiveTab();
-        });
-      });
-    }
-  });
-}
-
-function renderGallery(tab, rows) {
-  const query = $('#globalSearch').value.toLowerCase();
-  const filtered = rows.filter(r => !query || r.file.toLowerCase().includes(query));
-  contentEl.innerHTML = `
-    <div class="toolbar"><span class="count">${filtered.length} / ${rows.length} screenshots</span></div>
-    ${filtered.length ? `<div class="gallery">${filtered.map(r => `
-      <div class="shot" data-src="${r.url}">
-        <img src="${r.url}" loading="lazy" alt="${r.file}">
-        <div class="name">${r.file}</div>
-      </div>`).join('')}</div>` : `<div class="empty">No screenshots for this run.</div>`}
-  `;
-  contentEl.querySelectorAll('.shot').forEach(el => {
-    el.addEventListener('click', () => openLightbox(el.dataset.src));
-  });
-}
-
-function openLightbox(src) {
-  $('#lightboxImg').src = src;
-  $('#lightbox').style.display = 'flex';
-}
-$('#lightbox').addEventListener('click', () => { $('#lightbox').style.display = 'none'; });
-
+  await init();
+};
 init();
+})();
 </script>
 </body>
 </html>
