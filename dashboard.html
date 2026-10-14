@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gameberrylabs ASM — web &amp; network scan dashboard</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --border: #2a2f3a;
+    --text: #e6e9ef; --muted: #8b94a7; --accent: #4f8cff;
+    --crit: #ff4d4f; --high: #ff8c3c; --med: #ffc93c; --low: #4fd1a5; --info: #6c7a93;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+  }
+  header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: var(--panel);
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 600; white-space: nowrap; }
+  header h1 span { color: var(--muted); font-weight: 400; }
+  select, input[type=text] {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 6px; padding: 7px 10px; font-size: 13px;
+  }
+  input[type=text] { min-width: 240px; }
+  #globalSearch { margin-left: auto; }
+  #cards {
+    display: flex; gap: 10px; padding: 14px 20px; flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+  }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 16px; min-width: 110px;
+  }
+  .card .n { font-size: 20px; font-weight: 700; }
+  .card .l { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  nav#tabs {
+    display: flex; gap: 2px; padding: 0 20px; background: var(--panel);
+    border-bottom: 1px solid var(--border); overflow-x: auto;
+  }
+  nav#tabs button {
+    background: transparent; border: none; color: var(--muted); padding: 12px 14px;
+    font-size: 13px; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap;
+  }
+  nav#tabs button.active { color: var(--text); border-bottom-color: var(--accent); }
+  nav#tabs button:hover { color: var(--text); }
+  main { padding: 16px 20px; }
+  .toolbar { display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap; }
+  .toolbar .count { color: var(--muted); font-size: 12px; margin-left: auto; }
+  table { width: 100%; border-collapse: collapse; background: var(--panel); border-radius: 8px; overflow: hidden; }
+  thead th {
+    text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--border);
+    background: var(--panel2); cursor: pointer; user-select: none;
+  }
+  thead th:hover { color: var(--text); }
+  tbody td { padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-word; }
+  tbody tr:hover { background: var(--panel2); }
+  tbody tr:last-child td { border-bottom: none; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .sev-critical { background: rgba(255,77,79,.15); color: var(--crit); }
+  .sev-high { background: rgba(255,140,60,.15); color: var(--high); }
+  .sev-medium { background: rgba(255,201,60,.15); color: var(--med); }
+  .sev-low { background: rgba(79,209,165,.15); color: var(--low); }
+  .sev-info { background: rgba(108,122,147,.15); color: var(--info); }
+  .status-2 { color: var(--low); } .status-3 { color: var(--med); }
+  .status-4 { color: var(--high); } .status-5 { color: var(--crit); }
+  .empty { color: var(--muted); padding: 30px; text-align: center; }
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .shot { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; cursor: pointer; }
+  .shot img { width: 100%; height: 140px; object-fit: cover; display: block; background: #000; }
+  .shot .name { padding: 8px 10px; font-size: 12px; color: var(--muted); word-break: break-all; }
+  #lightbox {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.85);
+    align-items: center; justify-content: center; z-index: 100; cursor: zoom-out;
+  }
+  #lightbox img { max-width: 92vw; max-height: 92vh; border-radius: 6px; }
+  .pill-toggle { display: flex; gap: 6px; flex-wrap: wrap; }
+  .pill-toggle button {
+    background: var(--panel2); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 14px; padding: 5px 12px; font-size: 12px; cursor: pointer;
+  }
+  .pill-toggle button.active { color: var(--text); border-color: var(--accent); }
+  footer { padding: 16px 20px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>gameberrylabs ASM <span>— web &amp; network scan</span></h1>
+  <select id="runPicker" title="Scan run date"></select>
+  <input type="text" id="globalSearch" placeholder="Search current tab (any column)…">
+</header>
+
+<div id="cards"></div>
+
+<nav id="tabs"></nav>
+
+<main id="content"></main>
+
+<div id="lightbox"><img id="lightboxImg" src="" alt=""></div>
+
+<footer>Reads files written by <code>web_network_scan.sh</code> in this same directory. No server-side code — if tables stay empty, this page needs to be served over HTTP (e.g. <code>python3 -m http.server</code> from this folder), not opened as a local file.</footer>
+
+<script>
+// ============================================================================
+// Config — one entry per data file the script produces. Add a new tab by
+// adding one object here; nothing else needs to change for a simple table.
+// ============================================================================
+const TABS = [
+  { id: 'overview',   label: 'Overview' }, // special-cased, see renderOverview()
+  { id: 'subdomains',  label: 'Subdomains',    file: 'subfinder_raw.jsonl', type: 'jsonl',
+    columns: [['host','Host'],['source','Source']] },
+  { id: 'dns',         label: 'DNS Records',   file: 'dnsx_raw.jsonl', type: 'jsonl-dns',
+    columns: [['host','Host'],['a','A'],['aaaa','AAAA'],['cname','CNAME']] },
+  { id: 'webassets',   label: 'Web Assets',    file: 'httpx_raw.jsonl', type: 'jsonl',
+    columns: [['url','URL'],['status_code','Status'],['title','Title'],['webserver','Server'],['tech','Tech'],['cdn_name','CDN']],
+    filters: [{ key: 'status_code', label: 'Status', kind: 'status' }] },
+  { id: 'ports',       label: 'Open Ports',    file: 'naabu_raw.jsonl', type: 'jsonl-ports',
+    columns: [['ip','IP'],['port','Port']],
+    filters: [{ key: 'port', label: 'Port', kind: 'text' }] },
+  { id: 'tls',         label: 'TLS',           file: 'tlsx_raw.jsonl', type: 'jsonl',
+    columns: [['host','Host'],['tls_version','TLS Version'],['not_after','Expires'],['subject_an','SANs']] },
+  { id: 'crawled',     label: 'Crawled URLs',  file: 'crawled_urls.txt', type: 'txt',
+    columns: [['value','URL']] },
+  { id: 'dirfuzz',     label: 'Directory Fuzz',file: 'ffuf_combined.jsonl', type: 'jsonl',
+    columns: [['host','Host'],['url','Found URL'],['status','Status'],['length','Length'],['words','Words']],
+    filters: [{ key: 'status', label: 'Status', kind: 'status' }] },
+  { id: 'findings',    label: 'Findings',      file: 'findings_combined.jsonl', type: 'jsonl-finding',
+    columns: [['severity','Severity'],['template-id','Template'],['host','Host'],['matched-at','Matched At']],
+    filters: [{ key: 'severity', label: 'Severity', kind: 'severity' }] },
+  { id: 'dangling',    label: 'Dangling DNS',  file: 'dangling_dns.txt', type: 'txt',
+    columns: [['value','CNAME target not resolving']] },
+  { id: 'screenshots', label: 'Screenshots',   file: 'screenshots_index.json', type: 'images' },
+];
+
+let currentTab = 'overview';
+let currentRunDate = null;
+let rowCache = {};          // tabId -> parsed rows (unfiltered)
+let activeFilters = {};     // tabId -> { filterKey: value }
+
+const $ = (sel) => document.querySelector(sel);
+const contentEl = $('#content');
+const tabsEl = $('#tabs');
+const cardsEl = $('#cards');
+
+// ----------------------------------------------------------------------------
+// Bootstrap: find available run dates, pick the latest, build the tab bar.
+// ----------------------------------------------------------------------------
+async function init() {
+  tabsEl.innerHTML = TABS.map(t =>
+    `<button data-tab="${t.id}" class="${t.id === currentTab ? 'active' : ''}">${t.label}</button>`
+  ).join('');
+  tabsEl.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-tab]');
+    if (!btn) return;
+    switchTab(btn.dataset.tab);
+  });
+  $('#globalSearch').addEventListener('input', () => renderActiveTab());
+
+  let dates = [];
+  try {
+    const r = await fetch('runs_index.json', { cache: 'no-store' });
+    if (r.ok) dates = await r.json();
+  } catch (e) { /* no index yet */ }
+
+  let latest = null;
+  try {
+    const r = await fetch('latest_run.txt', { cache: 'no-store' });
+    if (r.ok) latest = (await r.text()).trim();
+  } catch (e) { /* ignore */ }
+
+  if (!dates.length && latest) dates = [latest];
+  if (!dates.length) {
+    contentEl.innerHTML = `<div class="empty">No runs found yet. Run <code>web_network_scan.sh</code> at least once, then reload this page.</div>`;
+    return;
+  }
+
+  const picker = $('#runPicker');
+  picker.innerHTML = dates.slice().reverse().map(d => `<option value="${d}">${d}</option>`).join('');
+  picker.value = latest && dates.includes(latest) ? latest : dates[dates.length - 1];
+  picker.addEventListener('change', () => loadRun(picker.value));
+
+  await loadRun(picker.value);
+}
+
+async function loadRun(date) {
+  currentRunDate = date;
+  rowCache = {};
+  activeFilters = {};
+  await renderOverviewCards();
+  await switchTab(currentTab, true);
+}
+
+function switchTab(tabId, force) {
+  if (tabId === currentTab && !force) return;
+  currentTab = tabId;
+  [...tabsEl.children].forEach(b => b.classList.toggle('active', b.dataset.tab === tabId));
+  $('#globalSearch').value = '';
+  return renderActiveTab();
+}
+
+// ----------------------------------------------------------------------------
+// Fetch + parse helpers
+// ----------------------------------------------------------------------------
+async function fetchText(path) {
+  const r = await fetch(path, { cache: 'no-store' });
+  if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+  return r.text();
+}
+
+function parseJSONL(text) {
+  return text.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+    try { return JSON.parse(l); } catch (e) { return null; }
+  }).filter(Boolean);
+}
+
+function parseTxtLines(text) {
+  return text.split('\n').map(l => l.trim()).filter(Boolean).map(v => ({ value: v }));
+}
+
+// Flatten a dnsx line's a/aaaa/cname arrays into display strings
+function normalizeDnsRow(r) {
+  return {
+    host: r.host || '',
+    a: (r.a || []).join(', '),
+    aaaa: (r.aaaa || []).join(', '),
+    cname: (r.cname || []).join(', '),
+  };
+}
+
+function normalizePortRow(r) {
+  return { ip: r.ip || r.host || '', port: r.port != null ? r.port : '' };
+}
+
+function normalizeFindingRow(r) {
+  const info = r.info || {};
+  return {
+    severity: (info.severity || 'info').toLowerCase(),
+    'template-id': r['template-id'] || r.templateID || '',
+    host: r.host || '',
+    'matched-at': r['matched-at'] || r.matched_at || '',
+  };
+}
+
+async function loadTabRows(tab) {
+  if (rowCache[tab.id]) return rowCache[tab.id];
+  const path = `${currentRunDate}/${tab.file}`;
+  let rows = [];
+  try {
+    if (tab.type === 'images') {
+      const text = await fetchText(path);
+      const names = JSON.parse(text);
+      rows = names.map(n => ({ file: n, url: `${currentRunDate}/screenshots/${n}` }));
+    } else if (tab.type === 'txt') {
+      rows = parseTxtLines(await fetchText(path));
+    } else if (tab.type === 'jsonl-dns') {
+      rows = parseJSONL(await fetchText(path)).map(normalizeDnsRow);
+    } else if (tab.type === 'jsonl-ports') {
+      rows = parseJSONL(await fetchText(path)).map(normalizePortRow);
+    } else if (tab.type === 'jsonl-finding') {
+      rows = parseJSONL(await fetchText(path)).map(normalizeFindingRow);
+    } else {
+      rows = parseJSONL(await fetchText(path));
+    }
+  } catch (e) {
+    rows = [];
+  }
+  rowCache[tab.id] = rows;
+  return rows;
+}
+
+// ----------------------------------------------------------------------------
+// Overview cards
+// ----------------------------------------------------------------------------
+async function renderOverviewCards() {
+  let m = {};
+  try {
+    m = JSON.parse(await fetchText(`${currentRunDate}/manifest.json`));
+  } catch (e) { /* manifest optional */ }
+  const labelMap = [
+    ['subdomains', 'Subdomains'], ['resolved_hosts', 'Resolved Hosts'],
+    ['live_urls', 'Live Web Assets'], ['open_ports', 'Open Ports'],
+    ['findings', 'Findings'], ['dir_fuzz_hits', 'Dir Fuzz Hits'],
+    ['dangling_dns', 'Dangling DNS'], ['screenshots', 'Screenshots'],
+  ];
+  cardsEl.innerHTML = labelMap.map(([k, l]) =>
+    `<div class="card"><div class="n">${m[k] != null ? m[k] : '–'}</div><div class="l">${l}</div></div>`
+  ).join('');
+}
+
+// ----------------------------------------------------------------------------
+// Rendering: generic table + generic filter row + search
+// ----------------------------------------------------------------------------
+async function renderActiveTab() {
+  if (currentTab === 'overview') return renderOverview();
+  const tab = TABS.find(t => t.id === currentTab);
+  if (!tab) return;
+  contentEl.innerHTML = `<div class="empty">Loading…</div>`;
+  const rows = await loadTabRows(tab);
+
+  if (tab.type === 'images') return renderGallery(tab, rows);
+  return renderTable(tab, rows);
+}
+
+function renderOverview() {
+  contentEl.innerHTML = `
+    <div class="empty" style="text-align:left; max-width:640px; margin:0 auto;">
+      <p style="font-size:14px; color:var(--text);">Run date: <b>${currentRunDate || '–'}</b></p>
+      <p>Pick a tab above for subdomains, DNS, open web assets, ports, TLS info,
+      crawled URLs, directory-fuzz hits, vulnerability/takeover findings,
+      dangling DNS candidates, or the screenshot gallery.</p>
+      <p>Use the search box (top right) to filter whatever tab is open across
+      every column at once. Some tabs also have a dropdown filter of their own
+      (severity, status code, port).</p>
+    </div>`;
+}
+
+function buildFilterBar(tab) {
+  if (!tab.filters || !tab.filters.length) return '';
+  activeFilters[tab.id] = activeFilters[tab.id] || {};
+  return tab.filters.map(f => {
+    if (f.kind === 'severity') {
+      const levels = ['critical', 'high', 'medium', 'low', 'info'];
+      const active = activeFilters[tab.id][f.key];
+      return `<div class="pill-toggle" data-filter-key="${f.key}">
+        <button data-val="" class="${!active ? 'active' : ''}">All</button>
+        ${levels.map(l => `<button data-val="${l}" class="${active === l ? 'active' : ''}">${l}</button>`).join('')}
+      </div>`;
+    }
+    if (f.kind === 'status') {
+      const buckets = [['2', '2xx'], ['3', '3xx'], ['4', '4xx'], ['5', '5xx']];
+      const active = activeFilters[tab.id][f.key];
+      return `<div class="pill-toggle" data-filter-key="${f.key}">
+        <button data-val="" class="${!active ? 'active' : ''}">All</button>
+        ${buckets.map(([v, l]) => `<button data-val="${v}" class="${active === v ? 'active' : ''}">${l}</button>`).join('')}
+      </div>`;
+    }
+    if (f.kind === 'text') {
+      return `<input type="text" placeholder="Filter by ${f.label.toLowerCase()}…"
+                data-filter-key="${f.key}" value="${activeFilters[tab.id][f.key] || ''}" style="min-width:140px;">`;
+    }
+    return '';
+  }).join('');
+}
+
+function matchesFilters(tab, row) {
+  const f = activeFilters[tab.id] || {};
+  for (const key in f) {
+    const val = f[key];
+    if (!val) continue;
+    const cell = String(row[key] ?? '');
+    if (key === 'status_code' || key === 'status') {
+      if (!cell.startsWith(val)) return false;
+    } else {
+      if (!cell.toLowerCase().includes(val.toLowerCase())) return false;
+    }
+  }
+  return true;
+}
+
+function matchesSearch(row, query) {
+  if (!query) return true;
+  const q = query.toLowerCase();
+  return Object.values(row).some(v => String(v ?? '').toLowerCase().includes(q));
+}
+
+function severityBadge(sev) {
+  const s = (sev || 'info').toLowerCase();
+  return `<span class="badge sev-${s}">${s}</span>`;
+}
+
+function statusClass(code) {
+  const s = String(code || '')[0];
+  return s ? `status-${s}` : '';
+}
+
+function cellValue(tab, col, row) {
+  const [key] = col;
+  const val = row[key];
+  if (key === 'severity') return severityBadge(val);
+  if ((key === 'status_code' || key === 'status') && val != null) {
+    return `<span class="${statusClass(val)}">${val}</span>`;
+  }
+  if ((key === 'url' || key === 'host') && val && /^https?:\/\//.test(val)) {
+    return `<a href="${val}" target="_blank" rel="noopener">${val}</a>`;
+  }
+  return val != null ? String(val) : '';
+}
+
+function renderTable(tab, rows) {
+  const query = $('#globalSearch').value;
+  const filterBar = buildFilterBar(tab);
+  const filtered = rows.filter(r => matchesFilters(tab, r) && matchesSearch(r, query));
+
+  contentEl.innerHTML = `
+    <div class="toolbar">
+      ${filterBar}
+      <span class="count">${filtered.length} / ${rows.length} rows</span>
+    </div>
+    ${filtered.length ? `
+    <table>
+      <thead><tr>${tab.columns.map(([k, l]) => `<th data-key="${k}">${l}</th>`).join('')}</tr></thead>
+      <tbody>${filtered.map(r => `<tr>${tab.columns.map(c => `<td>${cellValue(tab, c, r)}</td>`).join('')}</tr>`).join('')}</tbody>
+    </table>` : `<div class="empty">No rows match${rows.length ? ' the current filter/search' : ' — file may be empty or missing for this run'}.</div>`}
+  `;
+
+  contentEl.querySelectorAll('[data-filter-key]').forEach(el => {
+    if (el.tagName === 'INPUT') {
+      el.addEventListener('input', () => {
+        activeFilters[tab.id][el.dataset.filterKey] = el.value;
+        renderActiveTab();
+      });
+    } else {
+      el.querySelectorAll('button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeFilters[tab.id][el.dataset.filterKey] = btn.dataset.val;
+          renderActiveTab();
+        });
+      });
+    }
+  });
+}
+
+function renderGallery(tab, rows) {
+  const query = $('#globalSearch').value.toLowerCase();
+  const filtered = rows.filter(r => !query || r.file.toLowerCase().includes(query));
+  contentEl.innerHTML = `
+    <div class="toolbar"><span class="count">${filtered.length} / ${rows.length} screenshots</span></div>
+    ${filtered.length ? `<div class="gallery">${filtered.map(r => `
+      <div class="shot" data-src="${r.url}">
+        <img src="${r.url}" loading="lazy" alt="${r.file}">
+        <div class="name">${r.file}</div>
+      </div>`).join('')}</div>` : `<div class="empty">No screenshots for this run.</div>`}
+  `;
+  contentEl.querySelectorAll('.shot').forEach(el => {
+    el.addEventListener('click', () => openLightbox(el.dataset.src));
+  });
+}
+
+function openLightbox(src) {
+  $('#lightboxImg').src = src;
+  $('#lightbox').style.display = 'flex';
+}
+$('#lightbox').addEventListener('click', () => { $('#lightbox').style.display = 'none'; });
+
+init();
+</script>
+</body>
+</html>
