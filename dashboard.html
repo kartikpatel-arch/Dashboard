@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>gameberrylabs attack surface</title>
+<style>
+  :root {
+    --bg: #e8edf1;
+    --panel: #f7f9fa;
+    --raised: #ffffff;
+    --ink: #15222d;
+    --muted: #5a6b79;
+    --line: #cdd6dd;
+    --accent: #0f5c73;
+    --accent-ink: #ffffff;
+    --accent-soft: #d6e7ec;
+    --focus: #0f5c73;
+    --new: #7a3e00;
+    --new-bg: #fbe9cf;
+    --s-critical: #8f1d24; --s-critical-bg: #f7d9db;
+    --s-high: #a8480f;     --s-high-bg: #fbe0cd;
+    --s-medium: #7a5a00;   --s-medium-bg: #f6ecc4;
+    --s-low: #1f5d8c;      --s-low-bg: #d8e7f4;
+    --s-info: #4a5a68;     --s-info-bg: #e1e7ec;
+    --s-unknown: #4a5a68;  --s-unknown-bg: #e1e7ec;
+    --sans: "Segoe UI Variable", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Consolas, Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0c161d;
+      --panel: #121f28;
+      --raised: #172733;
+      --ink: #dce6ed;
+      --muted: #8da2b2;
+      --line: #25394a;
+      --accent: #5bbad6;
+      --accent-ink: #06222c;
+      --accent-soft: #17394a;
+      --focus: #7cd0e8;
+      --new: #f4c27a;
+      --new-bg: #3b2a10;
+      --s-critical: #ff9ea3; --s-critical-bg: #4a1b20;
+      --s-high: #ffb07a;     --s-high-bg: #4a2410;
+      --s-medium: #f0d36b;   --s-medium-bg: #403411;
+      --s-low: #8cc4f0;      --s-low-bg: #1a3347;
+      --s-info: #a5b6c3;     --s-info-bg: #22333f;
+      --s-unknown: #a5b6c3;  --s-unknown-bg: #22333f;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 14px/1.45 var(--sans); font-variant-numeric: tabular-nums;
+  }
+  button, input, select { font: inherit; color: inherit; }
+  a { color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .mono { font-family: var(--mono); font-size: 12.5px; }
+  .dim { color: var(--muted); }
+
+  /* ---------- shell ---------- */
+  .app { display: grid; grid-template-columns: 232px minmax(0, 1fr); grid-template-rows: auto 1fr; min-height: 100%; }
+  header {
+    grid-column: 1 / -1; display: flex; align-items: center; gap: 18px;
+    padding: 10px 20px; background: var(--panel); border-bottom: 1px solid var(--line);
+    position: sticky; top: 0; z-index: 20;
+  }
+  .brand { font-weight: 650; font-size: 15px; white-space: nowrap; letter-spacing: .1px; }
+  .brand span { font-weight: 400; color: var(--muted); }
+  .search { flex: 1 1 320px; max-width: 540px; position: relative; }
+  .search input {
+    width: 100%; padding: 8px 12px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--raised);
+  }
+  .search input::placeholder { color: var(--muted); }
+  .datepick { margin-left: auto; display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .datepick span { color: var(--muted); }
+  select {
+    padding: 7px 28px 7px 10px; border: 1px solid var(--line); border-radius: 6px;
+    background: var(--raised); max-width: 260px;
+  }
+  .datepick select { font-weight: 600; min-width: 190px; }
+
+  /* ---------- index rail ---------- */
+  nav { padding: 14px 10px 24px; border-right: 1px solid var(--line); background: var(--panel); overflow-y: auto; }
+  .group { margin: 14px 10px 4px; color: var(--muted); font-size: 12.5px; }
+  .group:first-child { margin-top: 2px; }
+  .tab {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%;
+    text-align: left; padding: 7px 10px; border: 0; border-left: 3px solid transparent;
+    background: none; border-radius: 0 6px 6px 0; cursor: pointer;
+  }
+  .tab:hover { background: var(--accent-soft); }
+  .tab[aria-current="page"] { border-left-color: var(--accent); background: var(--accent-soft); font-weight: 650; }
+  .tab .cnt { color: var(--muted); font-weight: 400; min-width: 2ch; text-align: right; }
+  .tab .cnt.hot { color: var(--s-high); font-weight: 650; }
+  .built { margin: 22px 12px 0; color: var(--muted); font-size: 12px; }
+
+  /* ---------- main ---------- */
+  main { padding: 18px 22px 40px; min-width: 0; }
+  h1 { font-size: 19px; margin: 0 0 4px; font-weight: 650; }
+  h2 { font-size: 14.5px; margin: 0 0 10px; font-weight: 650; }
+  .lede { margin: 0 0 18px; color: var(--muted); max-width: 70ch; }
+  .lede strong { color: var(--ink); }
+  .nb { white-space: nowrap; }
+
+  .filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-bottom: 14px; }
+  .f { display: flex; flex-direction: column; gap: 3px; }
+  .f > span { color: var(--muted); font-size: 12.5px; }
+  .chk { display: flex; align-items: center; gap: 7px; padding: 8px 2px; cursor: pointer; }
+  .chk input { width: 16px; height: 16px; accent-color: var(--accent); }
+  .btn {
+    padding: 7px 12px; border: 1px solid var(--line); background: var(--raised);
+    border-radius: 6px; cursor: pointer;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .spacer { flex: 1; }
+  .count { color: var(--muted); padding: 8px 0; }
+
+  .tablewrap {
+    background: var(--raised); border: 1px solid var(--line); border-radius: 8px;
+    overflow: auto; max-height: calc(100vh - 235px); min-height: 120px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { padding: 8px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+  td { word-break: break-word; }
+  thead th { position: sticky; top: 0; background: var(--panel); z-index: 2; padding: 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  thead button {
+    all: unset; box-sizing: border-box; cursor: pointer; width: 100%; padding: 9px 12px; font-weight: 600;
+    display: flex; gap: 6px; align-items: center;
+  }
+  thead button:hover { background: var(--accent-soft); }
+  thead button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .arr { color: var(--accent); font-size: 11px; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--accent-soft); }
+  tbody tr:last-child td { border-bottom: 0; }
+  td .num { display: inline-block; min-width: 4ch; }
+  .more { margin-top: 12px; }
+  .empty { padding: 40px 20px; text-align: center; color: var(--muted); }
+  .empty strong { display: block; color: var(--ink); margin-bottom: 4px; font-size: 15px; }
+
+  /* ---------- tags ---------- */
+  .sev {
+    display: inline-block; padding: 1px 9px; border-radius: 99px; font-size: 12.5px; font-weight: 600;
+    background: var(--s-unknown-bg); color: var(--s-unknown);
+  }
+  .s-critical { background: var(--s-critical-bg); color: var(--s-critical); }
+  .s-high { background: var(--s-high-bg); color: var(--s-high); }
+  .s-medium { background: var(--s-medium-bg); color: var(--s-medium); }
+  .s-low { background: var(--s-low-bg); color: var(--s-low); }
+  .s-info { background: var(--s-info-bg); color: var(--s-info); }
+  .tag {
+    display: inline-block; padding: 0 7px; margin: 0 4px 3px 0; border-radius: 4px; font-size: 12.5px;
+    background: var(--accent-soft); color: var(--ink);
+  }
+  .tag.warn { background: var(--s-high-bg); color: var(--s-high); font-weight: 600; }
+  .new { display: inline-block; margin-left: 8px; padding: 0 7px; border-radius: 4px; font-size: 12px; font-weight: 650; background: var(--new-bg); color: var(--new); vertical-align: 1px; }
+
+  /* ---------- overview ---------- */
+  .cols { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .block { background: var(--raised); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; margin-bottom: 18px; }
+  .att { all: unset; box-sizing: border-box; display: flex; gap: 10px; align-items: baseline; width: 100%; padding: 8px 6px; cursor: pointer; border-bottom: 1px solid var(--line); border-radius: 4px; }
+  .att:last-child { border-bottom: 0; }
+  .att:hover { background: var(--accent-soft); }
+  .att:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .att .t { min-width: 0; flex: 1; }
+  .att .t b { font-weight: 600; display: block; }
+  .att .t span { color: var(--muted); font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .chg { width: 100%; border-collapse: collapse; }
+  .chg td, .chg th { padding: 7px 4px; border-bottom: 1px solid var(--line); text-align: left; }
+  .chg th { font-weight: 400; color: var(--muted); }
+  .chg td:nth-child(n+2), .chg th:nth-child(n+2) { text-align: right; }
+  .chg tr:last-child td { border-bottom: 0; }
+  .chg a { cursor: pointer; }
+  .mix { display: flex; height: 14px; border-radius: 4px; overflow: hidden; background: var(--line); margin: 6px 0 10px; }
+  .mix i { display: block; height: 100%; }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; color: var(--muted); }
+  .legend b { color: var(--ink); font-weight: 600; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; }
+  .bars { display: grid; gap: 6px; }
+  .bar { all: unset; box-sizing: border-box; display: grid; grid-template-columns: 56px 1fr 34px; align-items: center; gap: 10px; cursor: pointer; padding: 2px 4px; border-radius: 4px; width: 100%; }
+  .bar:hover { background: var(--accent-soft); }
+  .bar:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .bar .track { height: 10px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .bar .fill { height: 100%; background: var(--accent); }
+  .bar .n { text-align: right; color: var(--muted); }
+
+  /* ---------- screenshots ---------- */
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+  .shot { all: unset; box-sizing: border-box; cursor: pointer; background: var(--raised); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+  .shot:hover { border-color: var(--accent); }
+  .shot:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+  .shot .img { aspect-ratio: 16 / 10; background: var(--panel); overflow: hidden; }
+  .shot img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: block; }
+  .shot .cap { padding: 8px 10px 10px; min-width: 0; }
+  .shot .cap .u { font-family: var(--mono); font-size: 12px; word-break: break-all; }
+  .shot .cap .m { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+
+  /* ---------- drawer ---------- */
+  .scrim { position: fixed; inset: 0; background: rgba(8, 16, 22, .45); z-index: 30; }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(560px, 100%); z-index: 31;
+    background: var(--panel); border-left: 1px solid var(--line); overflow: auto; padding: 18px 20px 30px;
+  }
+  .drawer h3 { margin: 0 80px 12px 0; font-size: 16px; word-break: break-word; }
+  .drawer .x { position: absolute; top: 12px; right: 14px; }
+  .drawer dl { margin: 0; display: grid; grid-template-columns: 130px 1fr; gap: 0; }
+  .drawer dt { color: var(--muted); padding: 7px 8px 7px 0; border-top: 1px solid var(--line); }
+  .drawer dd { margin: 0; padding: 7px 0; border-top: 1px solid var(--line); word-break: break-word; }
+  .drawer img { width: 100%; border: 1px solid var(--line); border-radius: 6px; margin-bottom: 14px; }
+  [hidden] { display: none !important; }
+
+  .fatal { max-width: 640px; margin: 80px auto; padding: 0 20px; }
+  .fatal code { background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; }
+
+  @media (max-width: 860px) {
+    .app { grid-template-columns: 1fr; }
+    header { flex-wrap: wrap; gap: 10px; padding: 10px 14px; }
+    .search { order: 3; flex-basis: 100%; max-width: none; }
+    nav { display: flex; overflow-x: auto; padding: 6px; border-right: 0; border-bottom: 1px solid var(--line); }
+    .group, .built { display: none; }
+    .tab { width: auto; flex: none; border-left: 0; border-bottom: 3px solid transparent; border-radius: 6px 6px 0 0; }
+    .tab[aria-current="page"] { border-bottom-color: var(--accent); }
+    main { padding: 14px; }
+    .cols { grid-template-columns: 1fr; }
+    .tablewrap { max-height: none; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header>
+    <div class="brand">gameberrylabs <span>attack surface</span></div>
+    <div class="search">
+      <input id="q" type="search" placeholder="Search every tab: host, IP, port, template, title" aria-label="Search every tab" autocomplete="off">
+    </div>
+    <label class="datepick"><span>Scan date</span><select id="date" aria-label="Scan date"></select></label>
+  </header>
+  <nav id="nav" aria-label="Sections"></nav>
+  <main id="main">
+    <div id="filters" class="filters"></div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<div id="scrim" class="scrim" hidden></div>
+<aside id="drawer" class="drawer" role="dialog" aria-modal="true" aria-label="Details" hidden>
+  <button class="btn x" id="drawerClose" aria-label="Close details">Close</button>
+  <div id="drawerBody"></div>
+</aside>
+
+<script>
+(() => {
+'use strict';
+
+/* ------------------------------------------------------------------ helpers */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const SEVS = ['critical', 'high', 'medium', 'low', 'info', 'unknown'];
+const RANK = Object.fromEntries(SEVS.map((s, i) => [s, i]));
+const SEV_COLOR = {critical:'var(--s-critical)', high:'var(--s-high)', medium:'var(--s-medium)', low:'var(--s-low)', info:'var(--s-info)', unknown:'var(--line)'};
+const fmt = (n) => Number(n).toLocaleString();
+const getJSON = (u) => fetch(u, {cache: 'no-store'}).then((r) => { if (!r.ok) throw new Error(u + ' returned ' + r.status); return r.json(); });
+
+/* --------------------------------------------------------------- tab config */
+const NEWF = {k: 'new', l: 'New since last scan', t: 'bool'};
+const TABS = [
+  {group: 'Summary', id: 'overview', label: 'Overview'},
+  {group: 'Issues', id: 'findings', label: 'Nuclei findings', table: 'findings',
+    sort: {k: 'severity', dir: 'asc'},
+    cols: [
+      {k: 'severity', l: 'Severity', t: 'sev'}, {k: 'name', l: 'Finding'},
+      {k: 'host', l: 'Target', t: 'mono'}, {k: 'matched_at', l: 'Matched at', t: 'link'},
+      {k: 'template_id', l: 'Template', t: 'mono'}, {k: 'kind', l: 'Type'}],
+    filters: [{k: 'severity', l: 'Severity', sort: 'sev'}, {k: 'template_id', l: 'Template'}, {k: 'kind', l: 'Type'}, NEWF],
+    empty: ['No nuclei findings on this date.', 'Findings appear here after asm.py finishes its nuclei scan.']},
+  {group: 'Issues', id: 'exposures', label: 'Secrets and exposed APIs', table: 'exposures',
+    sort: {k: 'severity', dir: 'asc'},
+    cols: [
+      {k: 'severity', l: 'Severity', t: 'sev'}, {k: 'description', l: 'Exposure'},
+      {k: 'matched_at', l: 'URL', t: 'link'}, {k: 'source', l: 'Found by'},
+      {k: 'template_id', l: 'Template', t: 'mono'}, {k: 'evidence_redacted', l: 'Evidence (redacted)', t: 'mono'}],
+    filters: [{k: 'severity', l: 'Severity', sort: 'sev'}, {k: 'source', l: 'Found by'}, {k: 'template_id', l: 'Template'}, NEWF],
+    empty: ['No exposed secrets or API specs on this date.', 'Checks cover .env and .git files, keys in JavaScript, Swagger/OpenAPI and GraphQL.']},
+  {group: 'Issues', id: 'takeover', label: 'Takeover and dangling DNS', table: 'takeover',
+    sort: {k: 'severity', dir: 'asc'},
+    cols: [
+      {k: 'severity', l: 'Severity', t: 'sev'}, {k: 'kind', l: 'Type'},
+      {k: 'host', l: 'Host', t: 'mono'}, {k: 'detail', l: 'Detail'}],
+    filters: [{k: 'kind', l: 'Type'}, {k: 'severity', l: 'Severity', sort: 'sev'}, NEWF],
+    empty: ['No takeover candidates or dangling records on this date.', 'Good news if the scan completed: nothing points at a missing target.']},
+  {group: 'Network', id: 'ports', label: 'Open ports', table: 'ports',
+    sort: {k: 'port', dir: 'asc'},
+    cols: [
+      {k: 'ip', l: 'IP', t: 'mono'}, {k: 'port', l: 'Port', t: 'num'},
+      {k: 'service', l: 'Service'}, {k: 'hosts', l: 'Hostnames', t: 'mono'},
+      {k: 'risky', l: 'Risky port', t: 'risky'}],
+    filters: [{k: 'port', l: 'Port', sort: 'num'}, {k: 'service', l: 'Service'}, {k: 'risky', l: 'Risky ports only', t: 'bool'}, NEWF],
+    empty: ['No open ports recorded on this date.', 'Port results come from naabu and nmap in asm.py.']},
+  {group: 'Network', id: 'tls', label: 'TLS certificates', table: 'tls',
+    sort: {k: 'days_left', dir: 'asc'},
+    cols: [
+      {k: 'host', l: 'Host', t: 'mono'}, {k: 'port', l: 'Port', t: 'num'},
+      {k: 'tls_version', l: 'TLS'}, {k: 'subject', l: 'Subject', t: 'mono'},
+      {k: 'issuer', l: 'Issuer'}, {k: 'expires', l: 'Expires'},
+      {k: 'days_left', l: 'Days left', t: 'num'}, {k: 'issues', l: 'Issues', t: 'issues'}],
+    filters: [{k: 'tls_version', l: 'TLS version'}, {k: 'issues', l: 'Certificate issue', arr: true}, NEWF],
+    empty: ['No TLS data on this date.', 'Certificates are read by tlsx in asm.py.']},
+  {group: 'Network', id: 'fuzz', label: 'Directory fuzzing', table: 'fuzz',
+    sort: {k: 'url', dir: 'asc'},
+    cols: [
+      {k: 'url', l: 'URL', t: 'link'}, {k: 'status', l: 'Status', t: 'num'},
+      {k: 'length', l: 'Bytes', t: 'num'}, {k: 'host', l: 'Host', t: 'mono'}],
+    filters: [{k: 'status', l: 'Status code', sort: 'num'}, NEWF],
+    empty: ['No paths found by ffuf on this date.', 'Run asm.py with the directory wordlist in place.']},
+  {group: 'Inventory', id: 'web', label: 'Web assets', table: 'web',
+    sort: {k: 'url', dir: 'asc'},
+    cols: [
+      {k: 'url', l: 'URL', t: 'link'}, {k: 'status', l: 'Status', t: 'num'},
+      {k: 'title', l: 'Title'}, {k: 'tech', l: 'Technology', t: 'list'},
+      {k: 'webserver', l: 'Server'}, {k: 'cdn', l: 'CDN'}, {k: 'length', l: 'Bytes', t: 'num'}],
+    filters: [{k: 'status_class', l: 'Status'}, {k: 'tech', l: 'Technology', arr: true}, {k: 'cdn', l: 'CDN'}, NEWF],
+    empty: ['No live web assets on this date.', 'httpx probes every resolved host in discovery.py.']},
+  {group: 'Inventory', id: 'subdomains', label: 'Subdomains', table: 'subdomains',
+    sort: {k: 'subdomain', dir: 'asc'},
+    cols: [
+      {k: 'subdomain', l: 'Subdomain', t: 'mono'}, {k: 'domain', l: 'Root domain'},
+      {k: 'source', l: 'Found by'}, {k: 'ips', l: 'IPs', t: 'mono'},
+      {k: 'cname', l: 'CNAME', t: 'mono'}, {k: 'live', l: 'Serves web', t: 'bool'}],
+    filters: [{k: 'domain', l: 'Root domain'}, {k: 'source', l: 'Found by'}, {k: 'live', l: 'Serving web only', t: 'bool'}, NEWF],
+    empty: ['No subdomains on this date.', 'subfinder and chaos results appear after discovery.py runs.']},
+  {group: 'Inventory', id: 'dns', label: 'DNS records', table: 'dns',
+    sort: {k: 'host', dir: 'asc'},
+    cols: [
+      {k: 'host', l: 'Host', t: 'mono'}, {k: 'record_type', l: 'Type'},
+      {k: 'value', l: 'Value', t: 'mono'}, {k: 'source', l: 'Source'}],
+    filters: [{k: 'record_type', l: 'Record type'}, {k: 'source', l: 'Source'}, NEWF],
+    empty: ['No DNS records on this date.', 'Records come from dnsx and, when enabled, Route53.']},
+  {group: 'Inventory', id: 'cloud', label: 'Cloud assets', table: 'cloud',
+    sort: {k: 'asset_type', dir: 'asc'},
+    cols: [
+      {k: 'provider', l: 'Provider'}, {k: 'asset_type', l: 'Type'},
+      {k: 'project', l: 'Project'}, {k: 'name', l: 'Name', t: 'mono'},
+      {k: 'region', l: 'Region'}, {k: 'public', l: 'Public', t: 'public'},
+      {k: 'detail', l: 'Detail', t: 'mono'}],
+    filters: [{k: 'provider', l: 'Provider'}, {k: 'asset_type', l: 'Type'}, {k: 'project', l: 'Project'}, {k: 'public', l: 'Public only', t: 'bool'}, NEWF],
+    empty: ['No cloud assets on this date.', 'GCP assets and public buckets are listed by discovery.py.']},
+  {group: 'Inventory', id: 'screenshots', label: 'Screenshots', table: 'screenshots', view: 'grid',
+    sort: {k: 'url', dir: 'asc'},
+    cols: [{k: 'url', l: 'URL', t: 'link'}, {k: 'status', l: 'Status'}, {k: 'title', l: 'Title'}],
+    filters: [{k: 'status', l: 'Status code', sort: 'num'}, NEWF],
+    empty: ['No screenshots on this date.', 'gowitness saves them under output/screenshots/<date>/.']},
+];
+const TAB = (id) => TABS.find((t) => t.id === id);
+
+/* -------------------------------------------------------------------- state */
+const state = {date: null, tab: 'overview', q: '', f: {}, sort: {}, limit: {}};
+let INDEX = null, DATA = null, VIEW = [], ATT = [];
+
+function writeHash() {
+  const p = new URLSearchParams();
+  if (state.date) p.set('date', state.date);
+  p.set('tab', state.tab);
+  if (state.q) p.set('q', state.q);
+  history.replaceState(null, '', '#' + p.toString());
+}
+
+/* ------------------------------------------------------------------ filters */
+function matchFilter(f, val, row) {
+  if (!val) return true;
+  if (f.t === 'bool') return !!row[f.k];
+  if (f.arr) return (row[f.k] || []).map(String).includes(val);
+  return String(row[f.k]) === val;
+}
+function activeFilters(tab) {
+  return tab.filters.filter((f) => !(f.k === 'new' && !DATA.has_baseline));
+}
+function rowsFor(tab, ignoreFilters) {
+  const rows = DATA.tables[tab.table] || [];
+  const toks = state.q.toLowerCase().split(/\s+/).filter(Boolean);
+  const fs = state.f[tab.id] || {};
+  const fl = ignoreFilters ? [] : activeFilters(tab);
+  return rows.filter((r) => toks.every((t) => r._s.includes(t)) && fl.every((f) => matchFilter(f, fs[f.k], r)));
+}
+function optionsFor(tab, f) {
+  const m = new Map();
+  (DATA.tables[tab.table] || []).forEach((r) => {
+    (f.arr ? (r[f.k] || []) : [r[f.k]]).forEach((v) => {
+      if (v === '' || v == null) return;
+      v = String(v); m.set(v, (m.get(v) || 0) + 1);
+    });
+  });
+  const keys = [...m.keys()];
+  if (f.sort === 'sev') keys.sort((a, b) => (RANK[a] ?? 9) - (RANK[b] ?? 9));
+  else if (f.sort === 'num') keys.sort((a, b) => Number(a) - Number(b));
+  else keys.sort((a, b) => a.localeCompare(b, undefined, {numeric: true}));
+  return keys.map((k) => [k, m.get(k)]);
+}
+function compare(a, b, k) {
+  if (k === 'severity') return (a._r ?? 9) - (b._r ?? 9);
+  const x = a[k], y = b[k];
+  const ex = x === '' || x == null, ey = y === '' || y == null;
+  if (ex || ey) return ex === ey ? 0 : ex ? 1 : -1;
+  if (typeof x === 'number' && typeof y === 'number') return x - y;
+  if (typeof x === 'boolean') return (y ? 1 : 0) - (x ? 1 : 0);
+  return String(Array.isArray(x) ? x.join(',') : x).localeCompare(String(Array.isArray(y) ? y.join(',') : y), undefined, {numeric: true});
+}
+
+/* ------------------------------------------------------------- cell render */
+function cell(c, r) {
+  const v = r[c.k];
+  switch (c.t) {
+    case 'sev': return `<span class="sev s-${esc(v)}">${esc(v)}</span>`;
+    case 'link':
+      if (!v) return '';
+      return /^https?:\/\//i.test(v)
+        ? `<a class="mono" href="${esc(v)}" target="_blank" rel="noopener noreferrer">${esc(v)}</a>`
+        : `<span class="mono">${esc(v)}</span>`;
+    case 'mono': return v ? `<span class="mono">${esc(v)}</span>` : '';
+    case 'num': return v === '' || v == null ? '' : `<span class="num">${esc(v)}</span>`;
+    case 'bool': return v ? '<span class="tag">yes</span>' : '<span class="dim">no</span>';
+    case 'public': return v ? '<span class="tag warn">public</span>' : '<span class="dim">private</span>';
+    case 'risky': return v ? '<span class="tag warn">risky</span>' : '';
+    case 'list': return (v || []).map((x) => `<span class="tag">${esc(x)}</span>`).join('');
+    case 'issues': return (v || []).map((x) => `<span class="tag warn">${esc(x)}</span>`).join('');
+    default: return esc(v);
+  }
+}
+
+/* ------------------------------------------------------------------- chrome */
+function renderNav() {
+  let last = '', html = '';
+  TABS.forEach((t) => {
+    if (t.group !== last) { html += `<div class="group">${esc(t.group)}</div>`; last = t.group; }
+    html += `<button class="tab" data-tab="${t.id}"><span>${esc(t.label)}</span><span class="cnt" id="cnt-${t.id}"></span></button>`;
+  });
+  html += `<div class="built" id="built"></div>`;
+  $('#nav').innerHTML = html;
+}
+function updateNav() {
+  document.querySelectorAll('.tab').forEach((b) => {
+    if (b.dataset.tab === state.tab) b.setAttribute('aria-current', 'page'); else b.removeAttribute('aria-current');
+  });
+  TABS.forEach((t) => {
+    const el = $('#cnt-' + t.id); if (!el || !t.table) return;
+    const rows = rowsFor(t, true);
+    el.textContent = fmt(rows.length);
+    el.classList.toggle('hot', (t.id === 'findings' || t.id === 'exposures') &&
+      rows.some((r) => r.severity === 'critical' || r.severity === 'high'));
+  });
+  $('#built').textContent = DATA ? 'Data built ' + DATA.generated_at : '';
+}
+
+function renderFilters(tab) {
+  const fs = state.f[tab.id] || (state.f[tab.id] = {});
+  let html = '';
+  activeFilters(tab).forEach((f) => {
+    if (f.t === 'bool') {
+      html += `<label class="chk"><input type="checkbox" data-k="${f.k}" ${fs[f.k] ? 'checked' : ''}> ${esc(f.l)}</label>`;
+      return;
+    }
+    const opts = optionsFor(tab, f);
+    if (!opts.length) return;
+    html += `<label class="f"><span>${esc(f.l)}</span><select data-k="${f.k}"><option value="">All</option>` +
+      opts.map(([v, n]) => `<option value="${esc(v)}" ${fs[f.k] === v ? 'selected' : ''}>${esc(v)} (${fmt(n)})</option>`).join('') +
+      `</select></label>`;
+  });
+  html += `<button class="btn" id="reset">Reset filters</button><span class="spacer"></span><span class="count" id="count"></span>` +
+          `<button class="btn" id="export">Export CSV</button>`;
+  $('#filters').innerHTML = html;
+}
+
+function renderResults(tab) {
+  const rows = rowsFor(tab).slice();
+  const s = state.sort[tab.id] || tab.sort;
+  rows.sort((a, b) => compare(a, b, s.k) * (s.dir === 'desc' ? -1 : 1));
+  VIEW = rows;
+  const total = (DATA.tables[tab.table] || []).length;
+  $('#count').textContent = `${fmt(rows.length)} of ${fmt(total)}`;
+  const limit = state.limit[tab.id] || 200;
+  const shown = rows.slice(0, limit);
+
+  if (!rows.length) {
+    const [h, p] = total ? ['Nothing matches these filters.', 'Clear a filter or the search box to see more.'] : tab.empty;
+    $('#view').innerHTML = `<div class="empty"><strong>${esc(h)}</strong>${esc(p)}</div>`;
+    return;
+  }
+  let html;
+  if (tab.view === 'grid') {
+    html = `<div class="grid">` + shown.map((r, i) => `
+      <button class="shot" data-i="${i}">
+        <div class="img"><img loading="lazy" alt="Screenshot of ${esc(r.url)}" src="${esc(encodeURI(r.file))}"></div>
+        <div class="cap"><div class="u">${esc(r.url)}${r.new ? '<span class="new">new</span>' : ''}</div>
+        <div class="m">${esc([r.status, r.title].filter(Boolean).join('  '))}</div></div>
+      </button>`).join('') + `</div>`;
+  } else {
+    html = `<div class="tablewrap"><table><thead><tr>` + tab.cols.map((c) => {
+      const on = s.k === c.k;
+      return `<th scope="col" aria-sort="${on ? (s.dir === 'desc' ? 'descending' : 'ascending') : 'none'}">` +
+             `<button data-sort="${c.k}">${esc(c.l)}<span class="arr">${on ? (s.dir === 'desc' ? '▼' : '▲') : ''}</span></button></th>`;
+    }).join('') + `</tr></thead><tbody>` + shown.map((r, i) =>
+      `<tr data-i="${i}" tabindex="0">` + tab.cols.map((c, ci) =>
+        `<td>${cell(c, r)}${ci === 0 && r.new ? '<span class="new">new</span>' : ''}</td>`).join('') + `</tr>`).join('') +
+      `</tbody></table></div>`;
+  }
+  if (rows.length > limit) html += `<button class="btn more" id="more">Show more (${fmt(rows.length - limit)} remaining)</button>`;
+  $('#view').innerHTML = html;
+}
+
+/* ----------------------------------------------------------------- overview */
+function renderOverview() {
+  const T = DATA.tables, N = DATA.new_counts, C = DATA.counts;
+  const newTotal = Object.values(N).reduce((a, b) => a + b, 0);
+
+  ATT = [];
+  T.findings.forEach((r) => ATT.push({tab: 'findings', r, sev: r.severity, title: r.name, sub: r.host}));
+  T.exposures.forEach((r) => ATT.push({tab: 'exposures', r, sev: r.severity, title: r.description || r.template_id, sub: r.matched_at}));
+  ATT = ATT.filter((x) => x.sev === 'critical' || x.sev === 'high').sort((a, b) => RANK[a.sev] - RANK[b.sev]);
+  const highPlus = ATT.length;
+  T.takeover.filter((r) => !(r.kind === 'takeover fingerprint' && (r.severity === 'critical' || r.severity === 'high')))
+    .forEach((r) => ATT.push({tab: 'takeover', r, sev: r.severity, title: r.kind, sub: r.host + '  ' + r.detail}));
+  T.ports.filter((r) => r.risky).forEach((r) => ATT.push({tab: 'ports', r, sev: 'medium', title: `Risky port ${r.port} open${r.service ? ' (' + r.service + ')' : ''}`, sub: r.ip + (r.hosts ? '  ' + r.hosts : '')}));
+  const shown = ATT.slice(0, 14);
+
+  const sevCount = Object.fromEntries(SEVS.map((s) => [s, 0]));
+  T.findings.concat(T.exposures).forEach((r) => { sevCount[r.severity] = (sevCount[r.severity] || 0) + 1; });
+  const sevTotal = Object.values(sevCount).reduce((a, b) => a + b, 0);
+
+  const pc = {};
+  T.ports.forEach((r) => { pc[r.port] = (pc[r.port] || 0) + 1; });
+  const top = Object.entries(pc).sort((a, b) => b[1] - a[1]).slice(0, 10);
+  const topMax = top.length ? top[0][1] : 1;
+
+  const issueWord = highPlus === 1 ? 'issue' : 'issues';
+  const lede = DATA.has_baseline
+    ? `<strong>${fmt(highPlus)}</strong> high or critical ${issueWord} across findings and exposures. <strong>${fmt(newTotal)}</strong> ${newTotal === 1 ? 'item is' : 'items are'} new since <span class="nb">${esc(DATA.previous_date)}</span>.`
+    : `<strong>${fmt(highPlus)}</strong> high or critical ${issueWord} across findings and exposures. This is the earliest scan on record, so nothing is marked new yet.`;
+
+  const rowsChg = [
+    ['ports', 'Open ports'], ['web', 'Web assets'], ['subdomains', 'Subdomains'], ['findings', 'Nuclei findings'],
+    ['exposures', 'Secrets and exposed APIs'], ['takeover', 'Takeover and dangling DNS'], ['cloud', 'Cloud assets'],
+  ].map(([id, label]) => `<tr><td>${esc(label)}</td><td>${fmt(C[id] ?? 0)}</td><td>${DATA.has_baseline
+      ? ((N[id] ?? 0) ? `<a data-new="${id}">${fmt(N[id])} new</a>` : '<span class="dim">0</span>') : '<span class="dim">n/a</span>'}</td></tr>`).join('');
+
+  return `
+    <h1>Scan of ${esc(DATA.date)}</h1>
+    <p class="lede">${lede}</p>
+    <div class="cols">
+      <div>
+        <div class="block"><h2>Needs attention</h2>
+          ${shown.length ? shown.map((x, i) => `
+            <button class="att" data-att="${i}"><span class="sev s-${esc(x.sev)}">${esc(x.sev)}</span>
+              <span class="t"><b>${esc(x.title)}</b><span>${esc(x.sub)}</span></span></button>`).join('')
+            : '<div class="dim">Nothing high or critical, no takeover candidates and no risky ports on this date.</div>'}
+          ${ATT.length > shown.length ? `<div class="dim" style="margin-top:8px">Showing ${shown.length} of ${fmt(ATT.length)}. The tabs on the left list everything.</div>` : ''}
+        </div>
+        <div class="block"><h2>Severity mix (findings and exposures)</h2>
+          ${sevTotal ? `<div class="mix" role="img" aria-label="Severity mix">${SEVS.filter((s) => sevCount[s]).map((s) => `<i style="width:${sevCount[s] / sevTotal * 100}%;background:${SEV_COLOR[s]}"></i>`).join('')}</div>
+          <div class="legend">${SEVS.filter((s) => sevCount[s]).map((s) => `<span><i class="dot" style="background:${SEV_COLOR[s]}"></i>${esc(s)} <b>${fmt(sevCount[s])}</b></span>`).join('')}</div>`
+            : '<div class="dim">No findings or exposures on this date.</div>'}
+        </div>
+      </div>
+      <div>
+        <div class="block"><h2>${DATA.has_baseline ? 'What changed' : 'What was found'}</h2>
+          <table class="chg"><thead><tr><th></th><th>Total</th><th>${DATA.has_baseline ? 'Since ' + esc(DATA.previous_date) : ''}</th></tr></thead><tbody>${rowsChg}</tbody></table>
+        </div>
+        <div class="block"><h2>Most common open ports</h2>
+          ${top.length ? `<div class="bars">${top.map(([p, n]) => `
+            <button class="bar" data-port="${esc(p)}" title="Show hosts with port ${esc(p)} open"><span class="mono">${esc(p)}</span>
+              <span class="track"><span class="fill" style="display:block;width:${n / topMax * 100}%"></span></span><span class="n">${fmt(n)}</span></button>`).join('')}</div>`
+            : '<div class="dim">No open ports on this date.</div>'}
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ------------------------------------------------------------------- drawer */
+function openDrawer(row) {
+  const title = row.url || row.name || row.description || row.subdomain || row.host || row.ip || row.kind || 'Details';
+  let body = `<h3>${esc(title)}</h3>`;
+  if (row.file) body += `<img alt="Screenshot of ${esc(row.url)}" src="${esc(encodeURI(row.file))}">`;
+  body += `<dl>` + Object.entries(row).filter(([k]) => !k.startsWith('_') && k !== 'file').map(([k, v]) => {
+    const val = Array.isArray(v) ? v.join(', ') : (typeof v === 'boolean' ? (v ? 'yes' : 'no') : v);
+    const isLink = typeof val === 'string' && /^https?:\/\//i.test(val);
+    return `<dt>${esc(k.replace(/_/g, ' '))}</dt><dd>${val === '' || val == null ? '<span class="dim">none</span>'
+      : isLink ? `<a class="mono" href="${esc(val)}" target="_blank" rel="noopener noreferrer">${esc(val)}</a>` : esc(val)}</dd>`;
+  }).join('') + `</dl>`;
+  $('#drawerBody').innerHTML = body;
+  $('#scrim').hidden = false; $('#drawer').hidden = false;
+  $('#drawerClose').focus();
+}
+function closeDrawer() { $('#scrim').hidden = true; $('#drawer').hidden = true; }
+
+/* ----------------------------------------------------------------- export */
+function exportCSV() {
+  const tab = TAB(state.tab); if (!tab || !tab.cols) return;
+  const safe = (v) => {
+    let s = Array.isArray(v) ? v.join('; ') : String(v ?? '');
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;           // stop spreadsheet formula injection from scanned data
+    return '"' + s.replace(/"/g, '""') + '"';
+  };
+  const keys = tab.cols.map((c) => c.k).concat(DATA.has_baseline ? ['new'] : []);
+  const lines = [keys.join(',')].concat(VIEW.map((r) => keys.map((k) => safe(r[k])).join(',')));
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([lines.join('\n')], {type: 'text/csv'}));
+  a.download = `asm-${tab.id}-${state.date}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* --------------------------------------------------------------- orchestrate */
+function render() {
+  const tab = TAB(state.tab);
+  updateNav();
+  if (tab.id === 'overview') { $('#filters').innerHTML = ''; $('#view').innerHTML = renderOverview(); }
+  else { renderFilters(tab); renderResults(tab); }
+  writeHash();
+}
+function setTab(id, opts) {
+  state.tab = id;
+  if (opts && opts.filter) state.f[id] = Object.assign({}, state.f[id], opts.filter);
+  render();
+  window.scrollTo({top: 0});
+}
+function prep(d) {
+  Object.values(d.tables).forEach((rows) => rows.forEach((r) => {
+    r._s = Object.entries(r).filter(([k, v]) => !k.startsWith('_') && typeof v !== 'boolean')
+      .map(([, v]) => (Array.isArray(v) ? v.join(' ') : String(v ?? ''))).join(' ').toLowerCase();
+    if ('severity' in r) r._r = RANK[r.severity] ?? 9;
+  }));
+}
+async function selectDate(date) {
+  DATA = await getJSON(`data/${encodeURIComponent(date)}.json`);
+  prep(DATA);
+  state.date = date; state.f = {}; state.limit = {};
+  $('#date').value = date;
+  render();
+}
+function fatal(title, html) {
+  $('#app').innerHTML = `<div class="fatal" style="grid-column:1/-1"><h1>${esc(title)}</h1><p>${html}</p></div>`;
+}
+
+function bind() {
+  $('#nav').addEventListener('click', (e) => { const b = e.target.closest('.tab'); if (b) setTab(b.dataset.tab); });
+  $('#date').addEventListener('change', (e) => selectDate(e.target.value).catch((err) => fatal('Could not load that date', esc(err.message))));
+  let t;
+  $('#q').addEventListener('input', (e) => { clearTimeout(t); t = setTimeout(() => { state.q = e.target.value.trim(); state.limit = {}; render(); }, 160); });
+  $('#filters').addEventListener('change', (e) => {
+    const k = e.target.dataset.k; if (!k) return;
+    const fs = state.f[state.tab] || (state.f[state.tab] = {});
+    fs[k] = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    state.limit[state.tab] = 200; renderResults(TAB(state.tab)); updateNav();
+  });
+  $('#filters').addEventListener('click', (e) => {
+    if (e.target.id === 'reset') { state.f[state.tab] = {}; state.q = ''; $('#q').value = ''; render(); }
+    if (e.target.id === 'export') exportCSV();
+  });
+  $('#view').addEventListener('click', (e) => {
+    const tab = TAB(state.tab);
+    if (e.target.closest('a[href]')) return;
+    const sort = e.target.closest('[data-sort]');
+    if (sort) {
+      const cur = state.sort[tab.id] || tab.sort, k = sort.dataset.sort;
+      state.sort[tab.id] = {k, dir: cur.k === k && cur.dir === 'asc' ? 'desc' : 'asc'};
+      return renderResults(tab);
+    }
+    if (e.target.id === 'more') { state.limit[tab.id] = (state.limit[tab.id] || 200) + 400; return renderResults(tab); }
+    const att = e.target.closest('[data-att]'); if (att) return openDrawer(ATT[+att.dataset.att].r);
+    const nw = e.target.closest('[data-new]'); if (nw) return setTab(nw.dataset.new, {filter: {new: true}});
+    const port = e.target.closest('[data-port]'); if (port) return setTab('ports', {filter: {port: port.dataset.port}});
+    const row = e.target.closest('[data-i]'); if (row) openDrawer(VIEW[+row.dataset.i]);
+  });
+  $('#view').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { const row = e.target.closest('tr[data-i]'); if (row) openDrawer(VIEW[+row.dataset.i]); }
+  });
+  $('#drawerClose').addEventListener('click', closeDrawer);
+  $('#scrim').addEventListener('click', closeDrawer);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('#drawer').hidden) closeDrawer(); });
+}
+
+async function init() {
+  try { INDEX = await getJSON('data/index.json'); }
+  catch (err) {
+    return fatal('The dashboard has no data to show yet',
+      `Open it through a web server, not as a file: run <code>python3 dashboard.py serve</code> on the scanner VM, then browse to the address it prints. ` +
+      `If you already did, run <code>python3 dashboard.py build</code> first. (${esc(err.message)})`);
+  }
+  if (!INDEX.dates.length) return fatal('No scans found', 'Run discovery.py and asm.py, then <code>python3 dashboard.py build</code>.');
+
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (TAB(p.get('tab'))) state.tab = p.get('tab');
+  state.q = p.get('q') || ''; $('#q').value = state.q;
+
+  const dates = INDEX.dates.map((d) => d.date);
+  $('#date').innerHTML = INDEX.dates.map((d, i) =>
+    `<option value="${esc(d.date)}">${esc(d.date)}${i === 0 ? ' (latest)' : ''}</option>`).join('');
+  renderNav(); bind();
+  await selectDate(dates.includes(p.get('date')) ? p.get('date') : dates[0]);
+}
+init().catch((err) => fatal('Something went wrong', esc(err.message)));
+})();
+</script>
+</body>
+</html>

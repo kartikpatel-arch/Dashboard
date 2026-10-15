@@ -1,0 +1,93 @@
+# ============================================================================
+# ASM config — gameberrylabs
+# Edit THIS file to add domains, change creds, or tune scan speed.
+# Both discovery.py and asm.py read from here. Don't hardcode anything
+# in the scripts themselves — if you find yourself doing that, put it here.
+# ============================================================================
+
+company: gameberrylabs
+
+# Root domains in scope. Add more here any time — nothing else needs to change.
+domains:
+  - gameberrylabs.com
+  - superkinglabs.com
+
+# ----------------------------------------------------------------------------
+# Cloud provider access
+# ----------------------------------------------------------------------------
+gcp:
+  # Leave empty to auto-discover every project the service account can see
+  # (via `gcloud projects list`). Fill in to restrict to specific projects.
+  projects: []
+  # Not read by any script — gcloud/gsutil authenticate using whatever
+  # identity is ambient on this machine. On this VM that's the attached
+  # service account (see MANUAL_SETUP.md step 5, Option A). Only relevant
+  # if you fall back to a downloaded JSON key (Option B in the same step).
+  # service_account_key: /home/kartik_patel_gameberrylabs_com/projects/asm/secrets/gcp-sa.json
+
+aws:
+  # Master switches. false = that check is skipped entirely (no AWS call, no error logs).
+  s3_enabled: false        # S3 public-bucket check
+  route53_enabled: fales    # Route53 zone dump (set false too if AWS creds aren't set up yet)
+  # Credentials come from the standard AWS credential chain (env vars,
+  # ~/.aws/credentials, or the profile named below). Only used for S3 + Route53.
+  profile: default
+  regions:
+    - us-east-1
+
+# ----------------------------------------------------------------------------
+# Optional ProjectDiscovery Chaos dataset (public bug-bounty recon data).
+# Leave the env var CHAOS_KEY unset to skip it silently.
+# ----------------------------------------------------------------------------
+chaos:
+  enabled: false   # set false to skip even if a key is present
+
+# ----------------------------------------------------------------------------
+# PostgreSQL
+# ----------------------------------------------------------------------------
+postgres:
+  host: localhost
+  port: 5432
+  dbname: asm
+  user: asm
+  password: "Gameberry@asm192002"
+
+# ----------------------------------------------------------------------------
+# Notifications (ProjectDiscovery `notify` tool — Slack/Discord/Telegram/etc.)
+# Provider config format: https://github.com/projectdiscovery/notify
+# ----------------------------------------------------------------------------
+notify:
+  enabled: false   # no Slack yet. Set true once provider_config below exists
+  provider_config: /home/kartik_patel_gameberrylabs_com/projects/asm/secrets/notify-provider.yaml
+
+# ----------------------------------------------------------------------------
+# Filesystem layout
+# ----------------------------------------------------------------------------
+paths:
+  base_dir: /home/kartik_patel_gameberrylabs_com/projects/asm
+  output_dir: /home/kartik_patel_gameberrylabs_com/projects/asm/output          # timestamped run folders go here
+  wordlist: /home/kartik_patel_gameberrylabs_com/projects/asm/wordlists/raft-small-directories.txt
+  sensitive_wordlist: /home/kartik_patel_gameberrylabs_com/projects/asm/wordlists/sensitive-paths.txt
+  nuclei_templates: ~/nuclei-templates
+  screenshot_dir: /home/kartik_patel_gameberrylabs_com/projects/asm/output/screenshots
+  log_dir: /home/kartik_patel_gameberrylabs_com/projects/asm/logs
+
+# ----------------------------------------------------------------------------
+# Tuning. Lower these on a small VM, raise on something beefier.
+# ----------------------------------------------------------------------------
+tuning:
+  subfinder_threads: 50
+  dnsx_threads: 100
+  naabu_rate: 1000
+  naabu_top_ports: 1000          # or "full" for all 65535 (much slower)
+  httpx_threads: 50
+  ffuf_threads: 40
+  ffuf_timeout: 10
+  nuclei_rate_limit: 150
+  nuclei_severities: "low,medium,high,critical"
+  katana_depth: 3
+  # Exposure pass (secrets / API specs). info severity is INCLUDED on purpose:
+  # most Swagger/OpenAPI and many token templates are tagged info.
+  exposure_tags: "exposure,token,apikey,config,env,git,backup,logs,debug,swagger,openapi,graphql,springboot,actuator"
+  exposure_severities: "info,low,medium,high,critical"
+  request_timeout: 10
